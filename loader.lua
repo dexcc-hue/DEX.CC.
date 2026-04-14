@@ -1,43 +1,40 @@
--- DEX.CC Loader v1.3 (Beta)
--- No copies esto wey, solo ejecútalo en Roblox jaja
--- Si estás leyendo esto en el navegador... ya perdiste xd
+-- DEX.CC Loader v1.4 (Anti-Leak Edition)
+-- Si estás leyendo esto en el navegador... ya perdiste wey xd
+-- No copies nada, solo ejecútalo en Roblox jaja
 
-local a = "d"
-local b = "e"
-local c = "x"
-local d = "."
-local e = "c"
-local f = "c"
-local g = math.random(1,999999)
-local h = "https://raw.githubusercontent.com/dexcc-hue/DEX.CC/main/main.lua"
+local _ = "d"
+local __ = "e"
+local ___ = "x"
+local ____ = "."
+local _____ = "c"
+local ______ = "c"
+local randomShit = math.random(999999, 9999999)
 
-local function basura1()
-    print("Cargando sistema anti-leak...")
-    return "xd"
-end
+local function garbage1() print("Cargando sistema anti-leak v2...") return "xd" end
+local function garbage2() local t = {} for i=1,80 do table.insert(t, "basura"..i) end return table.concat(t) end
+local function garbage3() return "DEX.CC" .. string.reverse("CC.XED") end
 
-local function basura2()
-    local x = {}
-    for i=1,50 do
-        table.insert(x, "basura"..i)
-    end
-    return table.concat(x, "")
-end
+print(garbage3())
+print(garbage2())
 
-local function basura3()
-    return "DEX.CC" .. string.reverse("CC.XED")
-end
+local part1 = "https://raw.githubusercontent.com/"
+local part2 = "dexcc-hue/"
+local part3 = "DEX.CC/"
+local part4 = "main/"
+local part5 = "main.lua"
 
-print("DEX.CC iniciado correctamente " .. basura3())
-print(basura2())
+local realUrl = part1 .. part2 .. part3 .. part4 .. part5
 
-local realLink = h .. "?t=" .. tostring(g) -- truco tonto para confundir
 
--- ========================
--- CARGANDO SCRIPT REAL...
--- ========================
+local fake1 = "https://google.com"
+local fake2 = "https://youtube.com"
+local fake3 = randomShit .. "no copies esto"
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dexcc-hue/DEX.CC./main/main.lua", true))()
+print("Cargando DEX.CC... por favor espera")
 
--- Fin del loader (no mires más wey)
--- Si llegaste hasta aquí... eres curioso xd
+
+loadstring(game:HttpGet(realUrl, true))()
+
+-- Fin del loader
+-- Si llegaste hasta aquí eres muy curioso xd
+print("✅ DEX.CC cargado correctamente")
