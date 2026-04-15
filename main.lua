@@ -1066,27 +1066,34 @@ local function GetResolvedVelocity(character)
     local hum = character:FindFirstChildOfClass("Humanoid")
     
     if ResolverMode == "Velocity" then
-        return root.AssemblyLinearVelocity
+        local vel = root.AssemblyLinearVelocity
+        return vel * 1.15          -- ← CAMBIA ESTE NÚMERO (1.0 = normal, 1.15 = más fuerte)
+        
     elseif ResolverMode == "MoveDirection" then
         if hum and hum.MoveDirection.Magnitude > 0 then
-            local speed = hum.WalkSpeed or 16
+            local speed = 22      -- ← CAMBIA ESTE NÚMERO (normal es 16)
             return hum.MoveDirection * speed
         else
             return Vector3.new()
         end
-    elseif ResolverMode == "TimeBased" then
+        elseif ResolverMode == "TimeBased" then
         local now = tick()
         local lastPos = ResolverLastPos[character] or root.Position
         local lastTick = ResolverLastTick[character] or now
         local dt = now - lastTick
-        if dt > 0.001 then
-            local vel = (root.Position - lastPos) / dt
-            ResolverVelocityCache[character] = vel
+
+        if dt > 0.001 and dt < 0.2 then   -- evita lag spikes
+            local calculatedVel = (root.Position - lastPos) / dt
+            ResolverVelocityCache[character] = calculatedVel
         end
+
         ResolverLastPos[character] = root.Position
         ResolverLastTick[character] = now
-        return ResolverVelocityCache[character] or Vector3.new()
-    end
+
+        -- ← ESTO ES LO IMPORTANTE:
+        local finalVel = ResolverVelocityCache[character] or root.AssemblyLinearVelocity
+        return finalVel
+       end
     return Vector3.new()
 end
 
