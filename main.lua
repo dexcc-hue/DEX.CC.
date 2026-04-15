@@ -989,20 +989,20 @@ local function UpdatePrediction()
         CurrentPrediction = (GetExactPing() / 1000) + BasePrediction
     elseif PredictionMode == "Blatant" then
         local ping = GetExactPing()
-        if ping < 50 then CurrentPrediction = 0.1275
-        elseif ping < 60 then CurrentPrediction = 0.1259
-        elseif ping < 70 then CurrentPrediction = 0.1416
-        elseif ping < 80 then CurrentPrediction = 0.1441
-        elseif ping < 90 then CurrentPrediction = 0.1430
-        elseif ping < 100 then CurrentPrediction = 0.1469
-        elseif ping < 110 then CurrentPrediction = 0.1452
-        elseif ping < 120 then CurrentPrediction = 0.1455
-        elseif ping < 130 then CurrentPrediction = 0.1461
-        elseif ping < 140 then CurrentPrediction = 0.1464
-        elseif ping < 150 then CurrentPrediction = 0.1473
-        else CurrentPrediction = 0.1471
-        end
+        if ping < 30 then
+        CurrentPrediction = 0.1188     -- Muy bajo ping → predicción baja y precisa
+    elseif ping < 60 then
+        CurrentPrediction = 0.1270     -- 30-59 ping (el rango más común)
+    elseif ping < 90 then
+        CurrentPrediction =0.1355
+    elseif ping < 120 then
+        CurrentPrediction = 0.1507
+    elseif ping < 150 then
+        CurrentPrediction = 0.1563
+    else
+        CurrentPrediction = 0.1663     -- 150+ ping (máximo estable)
     end
+  end
 end
 
 local pingText, pingTooltip = CreateMovablePingDisplay()
