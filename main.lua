@@ -1,5 +1,9 @@
 --[[
- DEX.CC - VERSIÓN FINAL CORREGIDA (HIT EFFECT ARREGLADO)
+ DEX.CC - VERSIÓN FINAL COMPACTA
+ - Color picker cíclico
+ - Notificaciones de hit
+ - FOV Circle toggle
+ - Interfaz ultra compacta
 --]]
 
 -- ================================
@@ -35,6 +39,3420 @@ local function AntiKick()
                 end)
                 table.insert(h, y)
             end
+        end
+    end
+
+    local o; o = hookfunction(getrenv().debug.info, newcclosure(function(...)
+        local a, f = ...
+        if x and a == x then
+            if d then warn(`adonis bypassed`) end
+            return coroutine.yield(coroutine.running())
+        end
+        return o(...)
+    end))
+
+    setthreadidentity(7)
+end
+
+pcall(AntiKick)
+
+-- ================================
+-- PANTALLA DE BIENVENIDA (SPLASH)
+-- ================================
+local function ShowWelcomeScreen()
+    local splashGui = Instance.new("ScreenGui")
+    splashGui.Name = "WelcomeScreen"
+    splashGui.ResetOnSpawn = false
+    splashGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    splashGui.Parent = game.CoreGui
+
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(0.95, 0, 0.95, 0)
+    bg.Position = UDim2.new(0.025, 0, 0.025, 0)
+    bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    bg.BackgroundTransparency = 0.1
+    bg.BorderSizePixel = 0
+    bg.Parent = splashGui
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = bg
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 60)
+    title.Position = UDim2.new(0, 0, 0.05, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "DEX.CC"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 28
+    title.TextScaled = true
+    title.Parent = bg
+
+    local image = Instance.new("ImageLabel")
+    image.Size = UDim2.new(0.6, 0, 0.6, 0)
+    image.Position = UDim2.new(0.2, 0, 0.2, 0)
+    image.BackgroundTransparency = 1
+    image.Image = "rbxassetid://97318186884444"
+    image.ScaleType = Enum.ScaleType.Fit
+    image.Parent = bg
+
+    local enterBtn = Instance.new("TextButton")
+    enterBtn.Size = UDim2.new(0.3, 0, 0.08, 0)
+    enterBtn.Position = UDim2.new(0.35, 0, 0.85, 0)
+    enterBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+    enterBtn.Text = "ENTER"
+    enterBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    enterBtn.Font = Enum.Font.GothamBold
+    enterBtn.TextSize = 20
+    enterBtn.Parent = bg
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 8)
+    btnCorner.Parent = enterBtn
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(150, 150, 200)
+    stroke.Thickness = 2
+    stroke.Parent = enterBtn
+
+    enterBtn.MouseButton1Click:Connect(function()
+        splashGui:Destroy()
+        if MainGUI then MainGUI.Enabled = true end
+    end)
+
+    return splashGui
+end
+
+-- ================================
+-- CONFIGURACIÓN INICIAL
+-- ================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local VirtualInput = game:GetService("VirtualInputManager")
+local Lighting = game:GetService("Lighting")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- ================================
+-- VARIABLES PRINCIPALES
+-- ================================
+local MasterEnabled = false
+local CamlockSelected = true
+local SilentSelected = true
+local IndependentSilentEnabled = false
+
+local CamlockEnabled = false
+local SilentEnabled = false
+local MacroSpeedEnabled = false
+local MacroEnabled = false
+
+local CamlockLockedTarget = nil
+local SilentLockedTarget = nil
+local ESPTarget = nil
+local FOVCircle = nil
+local FOVCircleEnabled = true
+local grayPulse = 0
+
+-- Ajustables
+local BasePrediction = 0.010
+local PredictionValue = 0.13
+local JumpOffset = -0.3
+local FallOffset = 0.27
+local SmoothingSpeed = 0.7
+local FOVRadius = 90
+local MacroSpeedValue = 120
+local SilentHitChance = 100
+local WallCheckEnabled = false
+local HitSoundEnabled = true
+
+local AutoAirshotEnabled = false
+local AirDelay = 0.22
+local AirStartTime = 0
+
+local ESPEnabled = true
+local ESPMode = "Highlight"
+local ESPNameText = nil
+
+-- ESP 2D
+local ESP2D = {
+    Frame = nil,
+    HealthBar = nil,
+    HealthBg = nil,
+    Active = false
+}
+
+local function Create2DESP()
+    if ESP2D.Frame then return end
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "ESP2D"
+    gui.ResetOnSpawn = false
+    gui.Parent = game.CoreGui
+
+    local box = Instance.new("Frame")
+    box.Size = UDim2.new(0, 70, 0, 105)
+    box.AnchorPoint = Vector2.new(0.5, 0.5)
+    box.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    box.BackgroundTransparency = 0.65
+    box.BorderSizePixel = 0
+    box.Visible = false
+    box.Parent = gui
+
+    local function createDash(parent, size, position, rotation)
+        local dash = Instance.new("Frame")
+        dash.Size = size
+        dash.Position = position
+        dash.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        dash.BorderSizePixel = 0
+        dash.Rotation = rotation or 0
+        dash.Parent = parent
+        return dash
+    end
+
+    createDash(box, UDim2.new(0.2,0,0,2), UDim2.new(0.05,0,0,0))
+    createDash(box, UDim2.new(0.2,0,0,2), UDim2.new(0.35,0,0,0))
+    createDash(box, UDim2.new(0.2,0,0,2), UDim2.new(0.65,0,0,0))
+    createDash(box, UDim2.new(0.2,0,0,2), UDim2.new(0.05,0,1,-2))
+    createDash(box, UDim2.new(0.2,0,0,2), UDim2.new(0.35,0,1,-2))
+    createDash(box, UDim2.new(0.2,0,0,2), UDim2.new(0.65,0,1,-2))
+    createDash(box, UDim2.new(0,2,0.2,0), UDim2.new(0,0,0.1,0))
+    createDash(box, UDim2.new(0,2,0.2,0), UDim2.new(0,0,0.45,0))
+    createDash(box, UDim2.new(0,2,0.2,0), UDim2.new(0,0,0.8,0))
+    createDash(box, UDim2.new(0,2,0.2,0), UDim2.new(1,-2,0.1,0))
+    createDash(box, UDim2.new(0,2,0.2,0), UDim2.new(1,-2,0.45,0))
+    createDash(box, UDim2.new(0,2,0.2,0), UDim2.new(1,-2,0.8,0))
+
+    local healthBg = Instance.new("Frame")
+    healthBg.Size = UDim2.new(0, 6, 1, 0)
+    healthBg.Position = UDim2.new(0, -10, 0, 0)
+    healthBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    healthBg.BorderSizePixel = 0
+    healthBg.Parent = box
+
+    local healthBar = Instance.new("Frame")
+    healthBar.Size = UDim2.new(1, 0, 1, 0)
+    healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    healthBar.BorderSizePixel = 0
+    healthBar.Parent = healthBg
+
+    ESP2D.Frame = box
+    ESP2D.HealthBar = healthBar
+    ESP2D.HealthBg = healthBg
+    ESP2D.Gui = gui
+end
+
+local function Destroy2DESP()
+    if ESP2D.Gui then ESP2D.Gui:Destroy() end
+    ESP2D.Frame = nil
+    ESP2D.HealthBar = nil
+    ESP2D.HealthBg = nil
+    ESP2D.Gui = nil
+    ESP2D.Active = false
+end
+
+local function Update2DESP(targetPlayer)
+    if not ESP2D.Frame then return end
+    if not targetPlayer or not targetPlayer.Character then
+        ESP2D.Frame.Visible = false
+        return
+    end
+    local head = targetPlayer.Character:FindFirstChild("Head")
+    local hum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if not head or not hum or hum.Health <= 0 then
+        ESP2D.Frame.Visible = false
+        return
+    end
+    local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+    if not onScreen then
+        ESP2D.Frame.Visible = false
+        return
+    end
+    ESP2D.Frame.Visible = true
+    local boxSize = ESP2D.Frame.AbsoluteSize
+    ESP2D.Frame.Position = UDim2.new(0, pos.X, 0, pos.Y - (boxSize.Y / 2))
+    local hp = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+    ESP2D.HealthBar.Size = UDim2.new(1, 0, hp, 0)
+    ESP2D.HealthBar.BackgroundColor3 = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), hp)
+end
+
+-- CurrentPrediction
+local CurrentPrediction = PredictionValue
+
+-- RAGE (Target Strafe)
+local TargetStrafeEnabled = false
+local TargetStrafeSpeed = 5.0
+local TargetStrafeRadius = 5.0
+local TargetStrafeHeight = 0.0
+local TargetStrafePattern = "circle"
+local TargetStrafeAngle = 0.0
+local TargetStrafeRandomOffset = 0.0
+local TargetStrafeLastUpdate = 0
+local TargetStrafeSpiralT = 0
+
+local NoclipActive = false
+local NoclipConnection = nil
+
+local ManualTarget = nil
+local PlayerListScrollingFrame = nil
+
+local FinisherEnabled = true
+local IsFinishing = false
+local DeadTarget = nil
+local StompKey = Enum.KeyCode.E
+local WasStrafeActive = false
+local StompCooldown = false
+
+-- AURA
+local AuraEnabled = false
+local CurrentAuraDesign = "⭐ StarLight"
+local CurrentAuraParts = {}
+local AllEmitters = {}
+local AuraTransparency = 0.4
+local AURA_DESIGNS = {
+    ["⭐ StarLight"] = "rbxassetid://134645216613107",
+    ["⭐ Star"] = "rbxassetid://73754563740680",
+    ["💨 Wind"] = "rbxassetid://80694081850877",
+}
+
+-- GUI Elements
+local MainGUI = nil
+local MainExternalButton = nil
+local MacroExternalButton = nil
+local WalkspeedExternalButton = nil
+local MacroBtn = nil
+local WalkspeedBtn = nil
+local ToggleGuiButton = nil
+
+local LastHealth = {}
+local LastHitTime = {}
+local LastGlobalHitTime = 0
+local LastGlobalSoundTime = 0
+
+-- Sonidos
+local GroundHitSound = "rbxassetid://124356179581089"
+local AirHitSound = "rbxassetid://134640174858937"
+
+-- Partes
+local GroundAimPart = "Head"
+local AirAimPart = "RightFoot"
+local GroundPartIndex = 1
+local AirPartIndex = 1
+local GroundPartList = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
+local AirPartList = {"RightFoot", "LeftFoot", "Head", "HumanoidRootPart"}
+
+-- ================================
+-- SISTEMA DE NOTIFICACIONES ORIGINAL
+-- ================================
+local NotificationsEnabled = true
+local InnalillahiMataKiri = Instance.new("ScreenGui")
+InnalillahiMataKiri.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+InnalillahiMataKiri.Parent = game:GetService("CoreGui")
+
+local Notifications_Frame = Instance.new("Frame")
+Notifications_Frame.Name = "Notifications"
+Notifications_Frame.BackgroundTransparency = 1
+Notifications_Frame.Size = UDim2.new(1, 0, 1, 36)
+Notifications_Frame.Position = UDim2.fromOffset(0, -36)
+Notifications_Frame.ZIndex = 5
+Notifications_Frame.Parent = InnalillahiMataKiri
+
+local ActiveNotifications = {}
+
+local function GetDictionaryLength(dictionary)
+    local count = 0
+    for _ in pairs(dictionary) do
+        count = count + 1
+    end
+    return count
+end
+
+function ShowNotification(Content, DelayTime)
+    if not NotificationsEnabled then return end
+    DelayTime = typeof(DelayTime) == "number" and DelayTime or 3
+
+    local Text = Instance.new("TextLabel")
+    local Notification = {self = Text, Class = "Notification"}
+
+    Text.Name = "Notification"
+    Text.BackgroundTransparency = 1
+    Text.Position = UDim2.new(0.5, -190, 1, -130 - (GetDictionaryLength(ActiveNotifications) * 15))
+    Text.Size = UDim2.new(0, 200, 0, 15)
+    Text.Text = Content
+    Text.Font = Enum.Font.SourceSans
+    Text.TextSize = 14
+    Text.TextColor3 = Color3.new(1, 1, 1)
+    Text.TextStrokeTransparency = 0.2
+    Text.TextTransparency = 1
+    Text.RichText = true
+    Text.ZIndex = 4
+    Text.Parent = Notifications_Frame
+
+    local function CustomTweenOffset(Offset)
+        spawn(function()
+            local Steps = 33
+            for i = 1, Steps do
+                Text.Position = Text.Position + UDim2.fromOffset(Offset / Steps, 0)
+                RunService.RenderStepped:Wait()
+            end
+        end)
+    end
+
+    function Notification:Destroy()
+        ActiveNotifications[Notification] = nil
+        Text:Destroy()
+        for _, v in pairs(ActiveNotifications) do
+            v.self.Position = v.self.Position + UDim2.fromOffset(0, 15)
+        end
+    end
+
+    ActiveNotifications[Notification] = Notification
+
+    local TweenIn = TweenService:Create(Text, TweenInfo.new(0.3), {TextTransparency = 0})
+    local TweenOut = TweenService:Create(Text, TweenInfo.new(0.2), {TextTransparency = 1})
+
+    TweenIn:Play()
+    CustomTweenOffset(100)
+
+    TweenIn.Completed:Connect(function()
+        delay(DelayTime, function()
+            TweenOut:Play()
+            CustomTweenOffset(100)
+            TweenOut.Completed:Connect(function()
+                Notification:Destroy()
+            end)
+        end)
+    end)
+end
+
+-- ================================
+-- VARIABLES DE SONIDOS Y EFECTOS
+-- ================================
+local SavedSounds = {
+    "rbxassetid://124356179581089",
+    "rbxassetid://135478009117226",
+    "rbxassetid://140721035016341",
+    "rbxassetid://140367458608473",
+    "rbxassetid://736191318"
+}
+local CurrentSoundId = SavedSounds[1]
+local SelectedSoundSlot = 1
+local HitEffectEnabled = true
+
+-- ================================
+-- HIT EFFECTS AVANZADOS
+-- ================================
+local HitEffectStyle = "Nova Impact"
+local HitEffectStyles = {
+    "Nova Impact",
+    "Crescent Slash",
+    "Cosmic Explosion",
+    "Slash",
+    "Atomic Slash",
+    "Coom"
+}
+local HitEffectTemplates = {}
+
+-- ================================
+-- NUEVAS VARIABLES: FORCEFIELD, CROSSHAIR, HIT CHAM/SKELETON
+-- ================================
+local ForcefieldEnabled = false
+local ForcefieldColor = Color3.fromRGB(128, 0, 255)
+local ForcefieldObjects = {}
+
+local CrosshairSettings = {
+    Enabled = true,
+    Mode = "Center",
+    Shape = "Cross",
+    Animation = "Pulse",
+    TextEnabled = true,
+    TextContent = "DEX.CC",
+    Color = Color3.fromRGB(255, 255, 255)
+}
+local CrosshairDrawings = {}
+local CrosshairTextDrawing = nil
+
+local HitChamSettings = {
+    Enabled = false,
+    Mode = "Cham",
+    Material = "Neon",
+    Duration = 2.0,
+    Color = Color3.fromRGB(180, 180, 180)
+}
+local ActiveHitEffects = {}  -- por jugador
+
+-- FOV Circle color
+local FOVCircleColor = Color3.fromRGB(80, 80, 90)
+
+-- ================================
+-- CÍRCULO DE PREDICCIÓN
+-- ================================
+local PredictionCircleEnabled = false
+local PredictionCircle = nil
+
+-- ================================
+-- AMBIENTE Y SKYBOX (ORIGINAL)
+-- ================================
+local AmbientColor = Lighting.Ambient
+local SkyboxId = nil
+local CurrentSky = nil
+
+local function SetAmbientColor(color)
+    AmbientColor = color
+    Lighting.Ambient = color
+    Lighting.OutdoorAmbient = color
+end
+
+local function SetSkybox(id)
+    SkyboxId = id or ""
+    for _, v in ipairs(Lighting:GetChildren()) do
+        if v:IsA("Sky") then
+            v:Destroy()
+        end
+    end
+    if not id or id == "" then
+        CurrentSky = nil
+        return
+    end
+    local assetId = id:match("%d+") or id
+    CurrentSky = Instance.new("Sky")
+    CurrentSky.Name = "Sky"
+    local url = "http://www.roblox.com/asset/?id=" .. assetId
+    CurrentSky.SkyboxBk = url
+    CurrentSky.SkyboxDn = url
+    CurrentSky.SkyboxFt = url
+    CurrentSky.SkyboxLf = url
+    CurrentSky.SkyboxRt = url
+    CurrentSky.SkyboxUp = url
+    CurrentSky.Parent = Lighting
+    Lighting.TimeOfDay = "12"
+    ShowNotification("🌌 Cielo cambiado (ID: " .. assetId .. ")", 1.5)
+end
+
+-- ================================
+-- FUNCIONES DE PERSISTENCIA
+-- ================================
+local function SaveSoundSlots()
+    local data = table.concat(SavedSounds, "\n")
+    writefile("DEXCC_Sounds.txt", data)
+end
+
+local function LoadSavedData()
+    if isfile("DEXCC_Sounds.txt") then
+        local content = readfile("DEXCC_Sounds.txt")
+        local lines = {}
+        for line in content:gmatch("[^\n]+") do
+            table.insert(lines, line)
+        end
+        for i = 1, math.min(5, #lines) do
+            SavedSounds[i] = lines[i]
+        end
+        CurrentSoundId = SavedSounds[1]
+    end
+end
+
+-- ================================
+-- CARGAR PLANTILLAS DE HIT EFFECTS
+-- ================================
+local function LoadHitEffectTemplates()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local function createEffect(name, setupFunction)
+        local part = Instance.new("Part")
+        part.Parent = ReplicatedStorage
+        part.Name = "HitEffect_" .. name
+        part.Transparency = 1
+        part.Anchored = true
+        part.CanCollide = false
+        part.Size = Vector3.new(0,0,0)
+        local att = Instance.new("Attachment", part)
+        setupFunction(att)
+        HitEffectTemplates[name] = att
+    end
+
+    -- Nova Impact
+    createEffect("Nova Impact", function(att)
+        local p1 = Instance.new("ParticleEmitter")
+        p1.Acceleration = Vector3.new(0,0,1)
+        p1.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
+            ColorSequenceKeypoint.new(0.495, Color3.fromRGB(255,0,0)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
+        })
+        p1.Lifetime = NumberRange.new(0.5,0.5)
+        p1.LightEmission = 1
+        p1.LockedToPart = true
+        p1.Rate = 1
+        p1.Rotation = NumberRange.new(0,360)
+        p1.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0,1),
+            NumberSequenceKeypoint.new(1,10),
+        })
+        p1.Speed = NumberRange.new(0,0)
+        p1.Texture = "rbxassetid://1084991215"
+        p1.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0,0),
+            NumberSequenceKeypoint.new(0.1,0.1),
+            NumberSequenceKeypoint.new(0.25,0.25),
+            NumberSequenceKeypoint.new(1,0.5),
+        })
+        p1.ZOffset = 1
+        p1.Parent = att
+        local p2 = p1:Clone()
+        p2.Acceleration = Vector3.new(0,1,-0.001)
+        p2.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
+        p2.Parent = att
+    end)
+
+    -- Crescent Slash
+    createEffect("Crescent Slash", function(att)
+        local Glow = Instance.new("ParticleEmitter")
+        Glow.Lifetime = NumberRange.new(0.16,0.16)
+        Glow.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(0.142,0.618),NumberSequenceKeypoint.new(1,1)})
+        Glow.Color = ColorSequence.new(Color3.fromRGB(91,177,252))
+        Glow.Speed = NumberRange.new(0,0)
+        Glow.Brightness = 5
+        Glow.Size = NumberSequence.new(9.18,16.5)
+        Glow.ZOffset = -0.056
+        Glow.Rate = 50
+        Glow.Texture = "rbxassetid://8708637750"
+        Glow.Parent = att
+
+        local Gradient1 = Instance.new("ParticleEmitter")
+        Gradient1.Lifetime = NumberRange.new(0.3,0.3)
+        Gradient1.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(0.15,0.3),NumberSequenceKeypoint.new(1,1)})
+        Gradient1.Color = ColorSequence.new(Color3.fromRGB(115,201,255))
+        Gradient1.Speed = NumberRange.new(0,0)
+        Gradient1.Brightness = 6
+        Gradient1.Size = NumberSequence.new(0,11.62)
+        Gradient1.ZOffset = 0.918
+        Gradient1.Rate = 50
+        Gradient1.Texture = "rbxassetid://8196169974"
+        Gradient1.Parent = att
+
+        local Shards = Instance.new("ParticleEmitter")
+        Shards.Lifetime = NumberRange.new(0.19,0.7)
+        Shards.SpreadAngle = Vector2.new(-90,90)
+        Shards.Color = ColorSequence.new(Color3.fromRGB(108,184,255))
+        Shards.Drag = 10
+        Shards.VelocitySpread = -90
+        Shards.Squash = NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(0.57,0.412),NumberSequenceKeypoint.new(1,-0.937)})
+        Shards.Speed = NumberRange.new(97.75,146.99)
+        Shards.Brightness = 4
+        Shards.Size = NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(0.284,1.238,0.153),NumberSequenceKeypoint.new(1,0)})
+        Shards.Acceleration = Vector3.new(0,-56.96,0)
+        Shards.ZOffset = 0.57
+        Shards.Rate = 50
+        Shards.Texture = "rbxassetid://8030734851"
+        Shards.Rotation = NumberRange.new(90,90)
+        Shards.Orientation = Enum.ParticleOrientation.VelocityParallel
+        Shards.Parent = att
+
+        local Crescents = Instance.new("ParticleEmitter")
+        Crescents.Lifetime = NumberRange.new(0.19,0.38)
+        Crescents.SpreadAngle = Vector2.new(-360,360)
+        Crescents.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(0.193,0),NumberSequenceKeypoint.new(0.778,0),NumberSequenceKeypoint.new(1,1)})
+        Crescents.LightEmission = 1
+        Crescents.Color = ColorSequence.new(Color3.fromRGB(92,161,252))
+        Crescents.VelocitySpread = -360
+        Crescents.Speed = NumberRange.new(0.082,0.082)
+        Crescents.Brightness = 20
+        Crescents.Size = NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(0.398,8.802,2.283),NumberSequenceKeypoint.new(1,11.47,1.86)})
+        Crescents.ZOffset = 0.454
+        Crescents.Rate = 50
+        Crescents.Texture = "rbxassetid://12509373457"
+        Crescents.RotSpeed = NumberRange.new(800,1000)
+        Crescents.Rotation = NumberRange.new(-360,360)
+        Crescents.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
+        Crescents.Parent = att
+    end)
+
+    -- Cosmic Explosion
+    createEffect("Cosmic Explosion", function(att)
+        local Glow = Instance.new("ParticleEmitter")
+        Glow.Lifetime = NumberRange.new(0.16,0.16)
+        Glow.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(0.142,0.618),NumberSequenceKeypoint.new(1,1)})
+        Glow.Color = ColorSequence.new(Color3.fromRGB(173,82,252))
+        Glow.Speed = NumberRange.new(0,0)
+        Glow.Brightness = 5
+        Glow.Size = NumberSequence.new(9.18,16.5)
+        Glow.ZOffset = -0.056
+        Glow.Rate = 50
+        Glow.Texture = "rbxassetid://8708637750"
+        Glow.Parent = att
+
+        local Effect = Instance.new("ParticleEmitter")
+        Effect.Lifetime = NumberRange.new(0.4,0.7)
+        Effect.FlipbookLayout = Enum.ParticleFlipbookLayout.Grid4x4
+        Effect.SpreadAngle = Vector2.new(360,-360)
+        Effect.LockedToPart = true
+        Effect.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(0.107,0.193),NumberSequenceKeypoint.new(0.776,0.881),NumberSequenceKeypoint.new(1,1)})
+        Effect.LightEmission = 1
+        Effect.Color = ColorSequence.new(Color3.fromRGB(173,82,252))
+        Effect.Drag = 1
+        Effect.VelocitySpread = 360
+        Effect.Speed = NumberRange.new(0.0036,0.0036)
+        Effect.Brightness = 2.1
+        Effect.Size = NumberSequence.new(6.96,9.92)
+        Effect.ZOffset = 0.477
+        Effect.Rate = 50
+        Effect.Texture = "rbxassetid://9484012464"
+        Effect.RotSpeed = NumberRange.new(-150,-150)
+        Effect.FlipbookMode = Enum.ParticleFlipbookMode.OneShot
+        Effect.Rotation = NumberRange.new(50,50)
+        Effect.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
+        Effect.Parent = att
+
+        local Crescents = Instance.new("ParticleEmitter")
+        Crescents.Lifetime = NumberRange.new(0.19,0.38)
+        Crescents.SpreadAngle = Vector2.new(-360,360)
+        Crescents.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(0.193,0),NumberSequenceKeypoint.new(0.778,0),NumberSequenceKeypoint.new(1,1)})
+        Crescents.LightEmission = 10
+        Crescents.Color = ColorSequence.new(Color3.fromRGB(160,96,255))
+        Crescents.VelocitySpread = -360
+        Crescents.Speed = NumberRange.new(0.082,0.082)
+        Crescents.Brightness = 4
+        Crescents.Size = NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(0.398,8.802,2.283),NumberSequenceKeypoint.new(1,11.47,1.86)})
+        Crescents.ZOffset = 0.454
+        Crescents.Rate = 50
+        Crescents.Texture = "rbxassetid://12509373457"
+        Crescents.RotSpeed = NumberRange.new(800,1000)
+        Crescents.Rotation = NumberRange.new(-360,360)
+        Crescents.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
+        Crescents.Parent = att
+    end)
+
+    -- Slash
+    createEffect("Slash", function(att)
+        local Crescents = Instance.new("ParticleEmitter")
+        Crescents.Lifetime = NumberRange.new(0.19,0.38)
+        Crescents.SpreadAngle = Vector2.new(-360,360)
+        Crescents.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(0.193,0),NumberSequenceKeypoint.new(0.778,0),NumberSequenceKeypoint.new(1,1)})
+        Crescents.LightEmission = 10
+        Crescents.Color = ColorSequence.new(Color3.fromRGB(160,96,255))
+        Crescents.VelocitySpread = -360
+        Crescents.Speed = NumberRange.new(0.082,0.082)
+        Crescents.Brightness = 4
+        Crescents.Size = NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(0.398,8.802,2.283),NumberSequenceKeypoint.new(1,11.47,1.86)})
+        Crescents.ZOffset = 0.454
+        Crescents.Rate = 50
+        Crescents.Texture = "rbxassetid://12509373457"
+        Crescents.RotSpeed = NumberRange.new(800,1000)
+        Crescents.Rotation = NumberRange.new(-360,360)
+        Crescents.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
+        Crescents.Parent = att
+    end)
+
+    -- Atomic Slash
+    createEffect("Atomic Slash", function(att)
+        local Crescents = Instance.new("ParticleEmitter")
+        Crescents.Lifetime = NumberRange.new(0.19,0.38)
+        Crescents.SpreadAngle = Vector2.new(-360,360)
+        Crescents.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(0.193,0),NumberSequenceKeypoint.new(0.778,0),NumberSequenceKeypoint.new(1,1)})
+        Crescents.LightEmission = 10
+        Crescents.Color = ColorSequence.new(Color3.fromRGB(160,96,255))
+        Crescents.VelocitySpread = -360
+        Crescents.Speed = NumberRange.new(0.082,0.082)
+        Crescents.Brightness = 4
+        Crescents.Size = NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(0.398,8.802,2.283),NumberSequenceKeypoint.new(1,11.47,1.86)})
+        Crescents.ZOffset = 0.454
+        Crescents.Rate = 50
+        Crescents.Texture = "rbxassetid://12509373457"
+        Crescents.RotSpeed = NumberRange.new(800,1000)
+        Crescents.Rotation = NumberRange.new(-360,360)
+        Crescents.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
+        Crescents.Parent = att
+
+        local Glow = Instance.new("ParticleEmitter")
+        Glow.Lifetime = NumberRange.new(0.16,0.16)
+        Glow.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(0.142,0.618),NumberSequenceKeypoint.new(1,1)})
+        Glow.Color = ColorSequence.new(Color3.fromRGB(173,82,252))
+        Glow.Speed = NumberRange.new(0,0)
+        Glow.Brightness = 5
+        Glow.Size = NumberSequence.new(9.18,16.5)
+        Glow.ZOffset = -0.056
+        Glow.Rate = 50
+        Glow.Texture = "rbxassetid://8708637750"
+        Glow.Parent = att
+    end)
+
+    -- Coom
+    createEffect("Coom", function(att)
+        local Foam = Instance.new("ParticleEmitter")
+        Foam.LightInfluence = 0.5
+        Foam.Lifetime = NumberRange.new(1,1)
+        Foam.SpreadAngle = Vector2.new(360,-360)
+        Foam.VelocitySpread = 360
+        Foam.Squash = NumberSequence.new(1)
+        Foam.Speed = NumberRange.new(20,20)
+        Foam.Brightness = 2.5
+        Foam.Size = NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(0.101,0.65),NumberSequenceKeypoint.new(0.649,1.42),NumberSequenceKeypoint.new(1,0)})
+        Foam.Acceleration = Vector3.new(0,-66.04,0)
+        Foam.Rate = 100
+        Foam.Texture = "rbxassetid://8297030850"
+        Foam.Rotation = NumberRange.new(-90,-90)
+        Foam.Orientation = Enum.ParticleOrientation.VelocityParallel
+        Foam.Parent = att
+    end)
+end
+
+LoadHitEffectTemplates()
+
+-- ================================
+-- FUNCIONES DE FORCEFIELD
+-- ================================
+local function ClearForcefield()
+    for _, obj in ipairs(ForcefieldObjects) do
+        if obj and obj.Parent then
+            obj:Destroy()
+        end
+    end
+    ForcefieldObjects = {}
+end
+
+local function CreateForcefield()
+    ClearForcefield()
+    if not ForcefieldEnabled then return end
+    
+    local character = LocalPlayer.Character
+    if not character then return end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = character
+    highlight.FillColor = ForcefieldColor
+    highlight.FillTransparency = 0.5
+    highlight.OutlineColor = ForcefieldColor:Lerp(Color3.new(1,1,1), 0.5)
+    highlight.OutlineTransparency = 0.2
+    highlight.Parent = character
+    table.insert(ForcefieldObjects, highlight)
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Size = UDim2.new(2, 0, 2, 0)
+    billboard.Adornee = character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart
+    billboard.AlwaysOnTop = true
+    billboard.Parent = character
+    table.insert(ForcefieldObjects, billboard)
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundColor3 = ForcefieldColor
+    frame.BackgroundTransparency = 0.6
+    frame.BorderSizePixel = 0
+    frame.Parent = billboard
+    table.insert(ForcefieldObjects, frame)
+
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local attachment = Instance.new("Attachment")
+        attachment.Parent = hrp
+        table.insert(ForcefieldObjects, attachment)
+
+        local particles = Instance.new("ParticleEmitter")
+        particles.Parent = attachment
+        particles.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+        particles.Color = ColorSequence.new(ForcefieldColor)
+        particles.Transparency = NumberSequence.new(0.6)
+        particles.SpreadAngle = Vector2.new(180, 180)
+        particles.VelocityInheritance = 0
+        particles.Rate = 30
+        particles.Lifetime = NumberRange.new(0.8)
+        particles.Speed = NumberRange.new(0.5, 1.5)
+        particles.Rotation = NumberRange.new(0, 360)
+        table.insert(ForcefieldObjects, particles)
+    end
+end
+
+-- ================================
+-- FUNCIONES DE CROSSHAIR
+-- ================================
+local function UpdateCrosshair()
+    for _, d in pairs(CrosshairDrawings) do
+        if d then d:Remove() end
+    end
+    CrosshairDrawings = {}
+    if CrosshairTextDrawing then
+        CrosshairTextDrawing:Remove()
+        CrosshairTextDrawing = nil
+    end
+
+    if not CrosshairSettings.Enabled then return end
+
+    local center = CrosshairSettings.Mode == "Center" 
+        and Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        or UserInputService:GetMouseLocation()
+
+    local shape = CrosshairSettings.Shape
+    local len = 10
+    local thick = 1.5
+    local gap = 6
+    local color = CrosshairSettings.Color
+    local pulse = 0.5 + 0.5 * math.sin(tick() * 3)
+
+    if CrosshairSettings.Animation == "Pulse" then
+        color = color:Lerp(Color3.new(1,1,1), pulse*0.5)
+    elseif CrosshairSettings.Animation == "Breathe" then
+        len = len * (0.8 + 0.4 * pulse)
+    end
+
+    if CrosshairSettings.TextEnabled then
+        local textDraw = Drawing.new("Text")
+        textDraw.Text = CrosshairSettings.TextContent
+        textDraw.Size = 12
+        textDraw.Font = 2
+        textDraw.Outline = true
+        textDraw.Center = true
+        textDraw.Position = center + Vector2.new(0, len + gap + 12)
+        textDraw.Color = color:Lerp(Color3.new(1,1,1), 0.3)
+        textDraw.Visible = true
+        CrosshairTextDrawing = textDraw
+    end
+
+    if shape == "Cross" then
+        local angle = 0
+        if CrosshairSettings.Animation == "Spin" then
+            angle = tick() * 2
+        end
+        local cos, sin = math.cos(angle), math.sin(angle)
+        local function rotate(v)
+            return Vector2.new(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos)
+        end
+        local lines = {
+            {Vector2.new(0, -gap), Vector2.new(0, -gap - len)},
+            {Vector2.new(0, gap), Vector2.new(0, gap + len)},
+            {Vector2.new(-gap, 0), Vector2.new(-gap - len, 0)},
+            {Vector2.new(gap, 0), Vector2.new(gap + len, 0)},
+        }
+        for _, pts in ipairs(lines) do
+            local line = Drawing.new("Line")
+            line.From = center + rotate(pts[1])
+            line.To = center + rotate(pts[2])
+            line.Color = color
+            line.Thickness = thick
+            line.Visible = true
+            table.insert(CrosshairDrawings, line)
+        end
+    elseif shape == "Circle" then
+        local circle = Drawing.new("Circle")
+        circle.Position = center
+        circle.Radius = len
+        circle.Thickness = thick
+        circle.Filled = false
+        circle.Color = color
+        circle.NumSides = 64
+        circle.Visible = true
+        table.insert(CrosshairDrawings, circle)
+    elseif shape == "Dot" then
+        local dot = Drawing.new("Circle")
+        dot.Position = center
+        dot.Radius = thick * 2
+        dot.Filled = true
+        dot.Color = color
+        dot.NumSides = 16
+        dot.Visible = true
+        table.insert(CrosshairDrawings, dot)
+    end
+end
+
+-- ================================
+-- FUNCIONES DE HIT MEJORADAS
+-- ================================
+
+-- Tabla para guardar los efectos activos por jugador (para poder cancelarlos)
+local ActiveHitEffects = {}  -- ActiveHitEffects[player] = { Clone = ..., Conn = ..., Highlight = ... }
+
+-- Función que aplica SOLO el efecto visual Cham/Skeleton (sin sonido)
+local function ApplyHitChamEffect(targetPlayer)
+    if not HitChamSettings.Enabled then return end
+    if not targetPlayer or not targetPlayer.Character then return end
+
+    local char = targetPlayer.Character
+    local duration = HitChamSettings.Duration
+    local mode = HitChamSettings.Mode
+    local material = HitChamSettings.Material
+    local color = HitChamSettings.Color
+
+    -- Cancelar efecto anterior si existe
+    if ActiveHitEffects[targetPlayer] then
+        local old = ActiveHitEffects[targetPlayer]
+        if old.Conn then old.Conn:Disconnect() end
+        if old.Clone then old.Clone:Destroy() end
+        if old.Highlight then old.Highlight:Destroy() end
+        ActiveHitEffects[targetPlayer] = nil
+    end
+
+    if mode == "Cham" then
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        -- Crear modelo contenedor
+        local statue = Instance.new("Model")
+        statue.Name = "HitCham_" .. targetPlayer.Name
+        statue.Parent = workspace
+
+        -- Función para crear una parte
+        local function createPart(name, size, offset, col, mat)
+            local part = Instance.new("Part")
+            part.Name = name
+            part.Size = size
+            part.Anchored = true
+            part.CanCollide = false
+            part.Material = mat
+            part.Color = col
+            part.Transparency = 0.3  -- ⬅️ Transparencia inicial (0 = opaco, 1 = invisible)
+            part.Parent = statue
+            part.CFrame = hrp.CFrame * CFrame.new(offset)
+            return part
+        end
+
+        local head = char:FindFirstChild("Head")
+        local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+
+        local headSize = head and head.Size or Vector3.new(2, 2, 2)
+        local torsoSize = torso and torso.Size or Vector3.new(2, 2, 1)
+        local armSize = Vector3.new(1, 2, 1)
+        local legSize = Vector3.new(1, 2, 1)
+
+        local headOffset = Vector3.new(0, 1.5, 0)
+        local torsoOffset = Vector3.new(0, 0, 0)
+        local leftArmOffset = Vector3.new(-1.5, 0.5, 0)
+        local rightArmOffset = Vector3.new(1.5, 0.5, 0)
+        local leftLegOffset = Vector3.new(-0.5, -1.5, 0)
+        local rightLegOffset = Vector3.new(0.5, -1.5, 0)
+
+        local matEnum = Enum.Material[material] or Enum.Material.Neon
+
+        createPart("Head", headSize, headOffset, color, matEnum)
+        createPart("Torso", torsoSize, torsoOffset, color, matEnum)
+        createPart("LeftArm", armSize, leftArmOffset, color, matEnum)
+        createPart("RightArm", armSize, rightArmOffset, color, matEnum)
+        createPart("LeftLeg", legSize, leftLegOffset, color, matEnum)
+        createPart("RightLeg", legSize, rightLegOffset, color, matEnum)
+
+        local highlight = Instance.new("Highlight")
+        highlight.Adornee = statue
+        highlight.FillColor = color
+        highlight.FillTransparency = 0.4
+        highlight.OutlineColor = Color3.new(1, 1, 1)
+        highlight.OutlineTransparency = 0.2
+        highlight.Parent = statue
+
+        local startTime = tick()
+        local conn
+        conn = RunService.RenderStepped:Connect(function()
+            local elapsed = tick() - startTime
+            if elapsed >= duration or not statue.Parent then
+                conn:Disconnect()
+                statue:Destroy()
+                if ActiveHitEffects[targetPlayer] and ActiveHitEffects[targetPlayer].Clone == statue then
+                    ActiveHitEffects[targetPlayer] = nil
+                end
+                return
+            end
+            local alpha = 1 - (elapsed / duration)
+            for _, part in ipairs(statue:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Transparency = 0.3 + (0.7 * (1 - alpha))  -- ⬅️ Desvanecimiento
+                end
+            end
+            if highlight then
+                highlight.FillTransparency = 0.4 + (0.6 * (1 - alpha))
+                highlight.OutlineTransparency = 0.2 + (0.8 * (1 - alpha))
+            end
+        end)
+
+        ActiveHitEffects[targetPlayer] = { Clone = statue, Conn = conn }
+
+    elseif mode == "Skeleton" then
+        local highlight = Instance.new("Highlight")
+        highlight.Adornee = char
+        highlight.FillTransparency = 1
+        highlight.OutlineColor = color
+        highlight.OutlineTransparency = 0
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Parent = char
+
+        game.Debris:AddItem(highlight, duration)
+
+        local startTime = tick()
+        local conn
+        conn = RunService.RenderStepped:Connect(function()
+            if not highlight.Parent then conn:Disconnect() return end
+            local elapsed = tick() - startTime
+            if elapsed >= duration then
+                highlight:Destroy()
+                conn:Disconnect()
+                if ActiveHitEffects[targetPlayer] and ActiveHitEffects[targetPlayer].Highlight == highlight then
+                    ActiveHitEffects[targetPlayer] = nil
+                end
+                return
+            end
+        end)
+
+        ActiveHitEffects[targetPlayer] = { Highlight = highlight, Conn = conn }
+    end
+end
+
+-- Función que reproduce SOLO el efecto visual (partículas + Cham/Skeleton)
+local function PlayHitEffectOnly(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character then return end
+
+    local char = targetPlayer.Character
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return end
+
+    -- Partículas del Hit Effect (solo si HitEffectEnabled es true)
+    if HitEffectEnabled then
+        local attachTo = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
+        if attachTo then
+            local template = HitEffectTemplates[HitEffectStyle]
+            if template then
+                local effectClone = template:Clone()
+                effectClone.Parent = attachTo
+                for _, emitter in ipairs(effectClone:GetDescendants()) do
+                    if emitter:IsA("ParticleEmitter") then
+                        emitter.Enabled = true
+                        emitter:Emit(emitter.Rate or 50)
+                    end
+                end
+                game:GetService("Debris"):AddItem(effectClone, 2.5)
+            end
+        end
+    end
+
+    -- Hit Cham / Skeleton (SIEMPRE se aplica, con su propio toggle interno)
+    ApplyHitChamEffect(targetPlayer)
+end
+
+-- Función que reproduce SOLO el sonido, flash y notificaciones (sonido/flash controlado por HitSoundEnabled)
+local function PlayHitSoundOnly(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character then return end
+    local hum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return end
+
+    local isInAir = hum.FloorMaterial == Enum.Material.Air 
+                 or hum:GetState() == Enum.HumanoidStateType.Freefall 
+                 or hum:GetState() == Enum.HumanoidStateType.Jumping
+
+    -- Sonido y flash solo si HitSoundEnabled es true
+    if HitSoundEnabled then
+        local soundIdToUse = isInAir and AirHitSound or CurrentSoundId
+        local sound = Instance.new("Sound")
+        sound.SoundId = soundIdToUse
+        sound.Volume = 1.8
+        sound.Parent = workspace.CurrentCamera
+        sound:Play()
+        game:GetService("Debris"):AddItem(sound, 1)
+
+        local flash = Instance.new("Frame")
+        flash.Size = UDim2.new(1, 0, 1, 0)
+        flash.BackgroundColor3 = isInAir and Color3.fromRGB(100, 180, 255) or Color3.fromRGB(255, 200, 150)
+        flash.BackgroundTransparency = 0.6
+        flash.Parent = LocalPlayer:WaitForChild("PlayerGui")
+        TweenService:Create(flash, TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
+        game:GetService("Debris"):AddItem(flash, 0.4)
+    end
+
+    -- Notificaciones siempre se muestran (respetando NotificationsEnabled)
+    if isInAir then
+        ShowNotification("💨 AIR HIT!", 0.8)
+    else
+        ShowNotification("💥 Hit! - " .. targetPlayer.Name, 1.0)
+    end
+end
+
+-- Función ORIGINAL que ahora solo llama a las dos anteriores (para compatibilidad)
+local function PlayHitSoundAndEffect(targetPlayer)
+    PlayHitEffectOnly(targetPlayer)
+    PlayHitSoundOnly(targetPlayer)
+end
+
+-- ================================
+-- PING Y PREDICCIÓN
+-- ================================
+local function CreateMovablePingDisplay()
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "PingDisplay"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.Parent = playerGui
+
+    local mainButton = Instance.new("TextButton")
+    mainButton.Size = UDim2.new(0, 90, 0, 28)
+    mainButton.Position = UDim2.new(0, 20, 0, 120)
+    mainButton.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    mainButton.BackgroundTransparency = 0.1
+    mainButton.BorderSizePixel = 0
+    mainButton.AutoButtonColor = false
+    mainButton.Text = ""
+    mainButton.Name = "PingButton"
+    mainButton.Parent = screenGui
+
+    local dragging, dragInput, dragStart, startPos
+    mainButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = mainButton.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    mainButton.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input == dragInput then
+            local delta = input.Position - dragStart
+            mainButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                           startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = mainButton
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(80, 120, 255)
+    stroke.Thickness = 1.5
+    stroke.Parent = mainButton
+
+    local pingIcon = Instance.new("TextLabel")
+    pingIcon.Size = UDim2.new(0, 20, 1, 0)
+    pingIcon.Position = UDim2.new(0, 4, 0, 0)
+    pingIcon.BackgroundTransparency = 1
+    pingIcon.Text = "📡"
+    pingIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+    pingIcon.TextSize = 12
+    pingIcon.Font = Enum.Font.Gotham
+    pingIcon.Name = "PingIcon"
+    pingIcon.Parent = mainButton
+
+    local pingText = Instance.new("TextLabel")
+    pingText.Size = UDim2.new(1, -28, 1, 0)
+    pingText.Position = UDim2.new(0, 24, 0, 0)
+    pingText.BackgroundTransparency = 1
+    pingText.Text = "... ms"
+    pingText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    pingText.TextSize = 10
+    pingText.Font = Enum.Font.GothamBold
+    pingText.TextXAlignment = Enum.TextXAlignment.Left
+    pingText.Name = "PingValue"
+    pingText.Parent = mainButton
+
+    local tooltip = Instance.new("TextLabel")
+    tooltip.Size = UDim2.new(0, 80, 0, 20)
+    tooltip.Position = UDim2.new(0, 0, -0.8, 0)
+    tooltip.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    tooltip.BackgroundTransparency = 0.1
+    tooltip.Text = ""
+    tooltip.TextColor3 = Color3.fromRGB(200, 200, 255)
+    tooltip.TextSize = 9
+    tooltip.Font = Enum.Font.Gotham
+    tooltip.Visible = false
+    tooltip.Name = "PingQuality"
+    tooltip.Parent = mainButton
+    local tooltipCorner = Instance.new("UICorner")
+    tooltipCorner.CornerRadius = UDim.new(0, 5)
+    tooltipCorner.Parent = tooltip
+
+    mainButton.MouseEnter:Connect(function()
+        tooltip.Visible = true
+        TweenService:Create(tooltip, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
+    end)
+    mainButton.MouseLeave:Connect(function()
+        TweenService:Create(tooltip, TweenInfo.new(0.2), {BackgroundTransparency = 0.1}):Play()
+        task.wait(0.2)
+        tooltip.Visible = false
+    end)
+
+    return pingText, tooltip
+end
+
+local function GetExactPing()
+    local function safeGetPing(method)
+        local success, ping = pcall(method)
+        return success and ping and ping > 0 and ping < 4000 and ping or nil
+    end
+    local methods = {
+        function() return game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() end,
+        function() return game:GetService("Stats").PerformanceStats.Ping:GetValue() * 1000 end,
+        function()
+            local networkClient = game:GetService("NetworkClient")
+            local connection = networkClient and networkClient:FindFirstChild("ClientReplicator")
+            local pingValue = connection and (connection:GetAttribute("Ping") or connection:GetAttribute("RoundTripTime"))
+            return pingValue and pingValue * 1000
+        end
+    }
+    for _, method in ipairs(methods) do
+        local ping = safeGetPing(method)
+        if ping then return ping end
+    end
+    return 50
+end
+
+local function GetPingQuality(ping)
+    if ping < 30 then return "🟢 EXCELENTE", Color3.fromRGB(0, 255, 0)
+    elseif ping < 60 then return "🟢 BUENO", Color3.fromRGB(100, 255, 100)
+    elseif ping < 100 then return "🟡 ACEPTABLE", Color3.fromRGB(255, 255, 0)
+    elseif ping < 150 then return "🟡 REGULAR", Color3.fromRGB(255, 200, 0)
+    elseif ping < 250 then return "🟠 ALTO", Color3.fromRGB(255, 100, 0)
+    else return "🔴 MUY ALTO", Color3.fromRGB(255, 50, 50) end
+end
+
+local PredictionMode = "PingBased"
+local function UpdatePrediction()
+    if PredictionMode == "Manual" then
+        CurrentPrediction = PredictionValue
+    elseif PredictionMode == "PingBased" then
+        CurrentPrediction = (GetExactPing() / 1000) + BasePrediction
+    elseif PredictionMode == "Blatant" then
+        local ping = GetExactPing()
+        if ping < 30 then
+            CurrentPrediction = 0.1188
+        elseif ping < 60 then
+            CurrentPrediction = 0.1270
+        elseif ping < 90 then
+            CurrentPrediction = 0.1355
+        elseif ping < 120 then
+            CurrentPrediction = 0.1507
+        elseif ping < 150 then
+            CurrentPrediction = 0.1563
+        else
+            CurrentPrediction = 0.1663
+        end
+    end
+end
+
+local pingText, pingTooltip = CreateMovablePingDisplay()
+coroutine.wrap(function()
+    while task.wait(0.5) do
+        local ping = GetExactPing()
+        local quality, color = GetPingQuality(ping)
+        if pingText then
+            pingText.Text = string.format("%d ms", ping)
+            pingText.TextColor3 = color
+        end
+        if pingTooltip then
+            pingTooltip.Text = quality
+            pingTooltip.TextColor3 = color
+        end
+        local icon = pingText and pingText.Parent:FindFirstChild("PingIcon")
+        if icon then
+            if ping < 60 then icon.Text = "📡"
+            elseif ping < 120 then icon.Text = "📶"
+            else icon.Text = "⚠️" end
+        end
+    end
+end)()
+
+-- ================================
+-- FUNCIONES AUXILIARES
+-- ================================
+local function GetRootPart(character)
+    return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Head")
+end
+
+local function IsDead(character)
+    local hum = character:FindFirstChildOfClass("Humanoid")
+    return not hum or hum.Health <= 0
+end
+
+local function IsValidTarget(player)
+    if not player.Character then return false end
+    local hum = player.Character:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return false end
+    return GetRootPart(player.Character) ~= nil
+end
+
+-- ================================
+-- RESOLVER
+-- ================================
+local ResolverEnabled = false
+local ResolverMode = "Velocity"
+local ResolverLastPos = {}
+local ResolverLastTick = {}
+local ResolverVelocityCache = {}
+
+local function GetResolvedVelocity(character)
+    if not ResolverEnabled then
+        local root = GetRootPart(character)
+        return root and root.AssemblyLinearVelocity or Vector3.new()
+    end
+    
+    local root = GetRootPart(character)
+    if not root then return Vector3.new() end
+    local hum = character:FindFirstChildOfClass("Humanoid")
+    
+    if ResolverMode == "Velocity" then
+        local vel = root.AssemblyLinearVelocity
+        return vel * 1.15
+    elseif ResolverMode == "MoveDirection" then
+        if hum and hum.MoveDirection.Magnitude > 0 then
+            local speed = 22
+            return hum.MoveDirection * speed
+        else
+            return Vector3.new()
+        end
+    elseif ResolverMode == "TimeBased" then
+        local now = tick()
+        local lastPos = ResolverLastPos[character] or root.Position
+        local lastTick = ResolverLastTick[character] or now
+        local dt = now - lastTick
+
+        if dt > 0.001 and dt < 0.2 then
+            local calculatedVel = (root.Position - lastPos) / dt
+            ResolverVelocityCache[character] = calculatedVel
+        end
+
+        ResolverLastPos[character] = root.Position
+        ResolverLastTick[character] = now
+
+        local finalVel = ResolverVelocityCache[character] or root.AssemblyLinearVelocity
+        return finalVel
+    end
+    return Vector3.new()
+end
+
+local function GetVelocity(character)
+    return GetResolvedVelocity(character)
+end
+
+local function GetPredictedPosition(character, part)
+    local vel = GetVelocity(character)
+    local predicted = part.Position + Vector3.new(vel.X * CurrentPrediction, vel.Y * CurrentPrediction, vel.Z * CurrentPrediction)
+    if vel.Y > 15 then
+        predicted = predicted + Vector3.new(0, JumpOffset, 0)
+    elseif vel.Y < -10 then
+        predicted = predicted + Vector3.new(0, FallOffset, 0)
+    end
+    return predicted
+end
+
+local function GetAimPart(player)
+    if not player or not player.Character then return nil end
+    local hum = player.Character:FindFirstChildOfClass("Humanoid")
+    local isInAir = hum and (hum.FloorMaterial == Enum.Material.Air or hum:GetState() == Enum.HumanoidStateType.Freefall)
+    local partName = isInAir and AirAimPart or GroundAimPart
+    local part = player.Character:FindFirstChild(partName)
+    if not part then part = player.Character:FindFirstChild("Head") or GetRootPart(player.Character) end
+    return part
+end
+
+local function WallCheck(part)
+    if not WallCheckEnabled then return true end
+    local ray = Ray.new(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * (part.Position - Camera.CFrame.Position).Magnitude)
+    local hit = workspace:FindPartOnRay(ray, LocalPlayer.Character)
+    return hit == nil or hit:IsDescendantOf(part.Parent)
+end
+
+local function GetClosestTargetInFOV()
+    local closest, closestDist = nil, math.huge
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and IsValidTarget(player) then
+            local part = GetAimPart(player)
+            if part then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local dist = (center - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+                    if dist < closestDist and dist <= FOVRadius and WallCheck(part) then
+                        closestDist = dist
+                        closest = player
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- ================================
+-- SILENT AIM (SOLO FIRESERVER)
+-- ================================
+local NoGroundShotEnabled = false
+
+local function Chance(percent) return math.random(100) <= percent end
+
+local oldIndex
+oldIndex = hookmetamethod(game, "__index", function(t, k)
+    if t:IsA("Mouse") and (k == "Hit" or k == "Target") then
+        local target = nil
+        if IndependentSilentEnabled then
+            target = GetClosestTargetInFOV()
+        elseif SilentEnabled then
+            target = SilentLockedTarget
+        end
+        if target and target.Character and Chance(SilentHitChance) then
+            if NoGroundShotEnabled then
+                local hum = target.Character:FindFirstChildOfClass("Humanoid")
+                local root = GetRootPart(target.Character)
+                if hum and root then
+                    local vel = root.AssemblyLinearVelocity
+                    local isFalling = vel.Y < -3 and hum.FloorMaterial == Enum.Material.Air
+                    if isFalling then
+                        return oldIndex(t, k)
+                    end
+                end
+            end
+            
+            local part = GetAimPart(target)
+            if part then
+                local predictedPos = GetPredictedPosition(target.Character, part)
+                if k == "Hit" then
+                    return CFrame.new(predictedPos)
+                end
+            end
+        end
+    end
+    return oldIndex(t, k)
+end)
+
+-- ================================
+-- CAMLOCK
+-- ================================
+local function UpdateCamlock()
+    if not CamlockEnabled then
+        CamlockLockedTarget = nil
+        return
+    end
+    if not CamlockLockedTarget or not CamlockLockedTarget.Character or IsDead(CamlockLockedTarget.Character) then
+        CamlockLockedTarget = GetClosestTargetInFOV()
+        if CamlockLockedTarget then
+            ShowNotification("DEX.CC ON " .. CamlockLockedTarget.Name, 1)
+        end
+        return
+    end
+    if not IsValidTarget(CamlockLockedTarget) then
+        CamlockLockedTarget = nil
+        return
+    end
+    local part = GetAimPart(CamlockLockedTarget)
+    if not part then return end
+    local targetPos = GetPredictedPosition(CamlockLockedTarget.Character, part)
+    local goal = CFrame.new(Camera.CFrame.Position, targetPos)
+    Camera.CFrame = Camera.CFrame:Lerp(goal, SmoothingSpeed)
+end
+
+-- ================================
+-- SILENT NORMAL
+-- ================================
+local function UpdateSilentAim()
+    if not SilentEnabled then
+        SilentLockedTarget = nil
+        return
+    end
+    if not SilentLockedTarget or not SilentLockedTarget.Character or IsDead(SilentLockedTarget.Character) then
+        SilentLockedTarget = GetClosestTargetInFOV()
+        if SilentLockedTarget then
+            ShowNotification("DEX.CC ON " .. SilentLockedTarget.Name, 1)
+        end
+    elseif not IsValidTarget(SilentLockedTarget) then
+        SilentLockedTarget = nil
+    end
+end
+
+-- ================================
+-- TARGET ESP
+-- ================================
+local function UpdateTargetESP()
+    if not ESPEnabled then
+        if ESPTarget and ESPTarget.Character then
+            local highlight = ESPTarget.Character:FindFirstChildOfClass("Highlight")
+            if highlight then highlight:Destroy() end
+        end
+        if ESPNameText then 
+            ESPNameText:Remove() 
+            ESPNameText = nil 
+        end
+        ESPTarget = nil
+        if ESP2D.Frame then ESP2D.Frame.Visible = false end
+        return
+    end
+    
+    local newTarget = nil
+    if CamlockEnabled and CamlockLockedTarget and IsValidTarget(CamlockLockedTarget) then
+        newTarget = CamlockLockedTarget
+    elseif SilentEnabled and SilentLockedTarget and IsValidTarget(SilentLockedTarget) then
+        newTarget = SilentLockedTarget
+    elseif IndependentSilentEnabled then
+        newTarget = GetClosestTargetInFOV()
+    end
+    
+    if newTarget ~= ESPTarget then
+        if ESPTarget and ESPTarget.Character then
+            local oldHighlight = ESPTarget.Character:FindFirstChildOfClass("Highlight")
+            if oldHighlight then oldHighlight:Destroy() end
+        end
+        ESPTarget = newTarget
+    end
+    
+    if not ESPTarget or not ESPTarget.Character then
+        if ESPNameText then ESPNameText.Visible = false end
+        if ESP2D.Frame then ESP2D.Frame.Visible = false end
+        return
+    end
+    
+    if ESPMode == "Highlight" then
+        if ESPNameText then 
+            ESPNameText:Remove() 
+            ESPNameText = nil 
+        end
+        if ESP2D.Frame then ESP2D.Frame.Visible = false end
+        local highlight = ESPTarget.Character:FindFirstChildOfClass("Highlight")
+        if not highlight then
+            highlight = Instance.new("Highlight")
+            highlight.Adornee = ESPTarget.Character
+            highlight.FillTransparency = 0.4
+            highlight.OutlineColor = Color3.fromRGB(30,30,30)
+            highlight.OutlineTransparency = 0.2
+            highlight.Parent = ESPTarget.Character
+        end
+        local gray = 0.4 + math.sin(grayPulse) * 0.2
+        highlight.FillColor = Color3.fromRGB(gray*255, gray*255, gray*255)
+    
+    elseif ESPMode == "Name" then
+        if ESPTarget.Character:FindFirstChildOfClass("Highlight") then
+            ESPTarget.Character:FindFirstChildOfClass("Highlight"):Destroy()
+        end
+        if ESP2D.Frame then ESP2D.Frame.Visible = false end
+        local head = ESPTarget.Character:FindFirstChild("Head")
+        local posPart = head or GetRootPart(ESPTarget.Character)
+        if posPart then
+            local screenPos, onScreen = Camera:WorldToViewportPoint(posPart.Position)
+            if onScreen then
+                if not ESPNameText then
+                    ESPNameText = Drawing.new("Text")
+                    ESPNameText.Center = true
+                    ESPNameText.Outline = true
+                    ESPNameText.OutlineColor = Color3.fromRGB(0,0,0)
+                    ESPNameText.Size = 13
+                    ESPNameText.Font = 2
+                end
+                ESPNameText.Position = Vector2.new(screenPos.X, screenPos.Y - 22)
+                ESPNameText.Text = ESPTarget.Name
+                local gray = 0.4 + math.sin(grayPulse) * 0.2
+                ESPNameText.Color = Color3.fromRGB(gray*255, gray*255, gray*255)
+                ESPNameText.Visible = true
+            else
+                if ESPNameText then ESPNameText.Visible = false end
+            end
+        end
+    
+    elseif ESPMode == "2DBox" then
+        if ESPNameText then ESPNameText.Visible = false end
+        if ESPTarget.Character:FindFirstChildOfClass("Highlight") then
+            ESPTarget.Character:FindFirstChildOfClass("Highlight"):Destroy()
+        end
+        if not ESP2D.Frame then Create2DESP() end
+        Update2DESP(ESPTarget)
+    end
+end
+
+-- ================================
+-- ACTUALIZACIÓN DE ESTADOS
+-- ================================
+local function UpdateEnabledStates()
+    if MasterEnabled then
+        CamlockEnabled = CamlockSelected
+        SilentEnabled = SilentSelected
+    else
+        CamlockEnabled = false
+        SilentEnabled = false
+        CamlockLockedTarget = nil
+        SilentLockedTarget = nil
+        ShowNotification("DEX.CC OFF", 1.2)
+    end
+    if MainExternalButton then
+        MainExternalButton.Image = MasterEnabled and "rbxassetid://284402752" or "rbxassetid://284402785"
+    end
+end
+
+-- ================================
+-- MACRO, WALKSPEED, AIRSHOT
+-- ================================
+local function UpdateWalkspeed()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    if MacroSpeedEnabled then
+        if hum.FloorMaterial ~= Enum.Material.Air then
+            hum.WalkSpeed = MacroSpeedValue
+        end
+    else
+        if hum.WalkSpeed == MacroSpeedValue then hum.WalkSpeed = 16 end
+    end
+end
+
+local macroConnection = nil
+local function UpdateMacro()
+    if MacroEnabled then
+        if not macroConnection then
+            macroConnection = RunService.RenderStepped:Connect(function()
+                local char = LocalPlayer.Character
+                if char then
+                    local root = GetRootPart(char)
+                    if root then
+                        local flatLook = Vector3.new(Camera.CFrame.LookVector.X, 0, Camera.CFrame.LookVector.Z).Unit
+                        root.CFrame = CFrame.new(root.Position, root.Position + flatLook)
+                    end
+                end
+            end)
+        end
+    else
+        if macroConnection then macroConnection:Disconnect() macroConnection = nil end
+    end
+end
+
+local function HasMeleeWeapon()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if not tool then return false end
+    local name = tool.Name:lower()
+    local keywords = {"katana","cuchillo","knife","sword","machete","bat","hacha"}
+    for _, kw in ipairs(keywords) do
+        if name:find(kw) then return true end
+    end
+    return false
+end
+
+local function IsInAir(humanoid)
+    if not humanoid then return false end
+    return humanoid.FloorMaterial == Enum.Material.Air or humanoid:GetState() == Enum.HumanoidStateType.Freefall or humanoid:GetState() == Enum.HumanoidStateType.Jumping
+end
+
+local function TryAutoAirshot()
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if not tool then return end
+    
+    if HasMeleeWeapon() then return end
+    
+    local target = nil
+    if IndependentSilentEnabled then
+        target = GetClosestTargetInFOV()
+    elseif CamlockEnabled then
+        target = CamlockLockedTarget
+    elseif SilentEnabled then
+        target = SilentLockedTarget
+    end
+    
+    if not target or not target.Character then return end
+    
+    local hum = target.Character:FindFirstChildOfClass("Humanoid")
+    if hum and IsInAir(hum) then
+        tool:Activate()
+        task.delay(0.02, function()
+            if tool and tool.Parent then tool:Activate() end
+        end)
+     end
+end
+
+-- ================================
+-- NOCLIP
+-- ================================
+local function EnableNoclip()
+    if NoclipActive then return end
+    NoclipActive = true
+    if NoclipConnection then NoclipConnection:Disconnect() end
+    NoclipConnection = RunService.Stepped:Connect(function()
+        if not TargetStrafeEnabled then
+            DisableNoclip()
+            return
+        end
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+    ShowNotification("🔓 Noclip activado", 1)
+end
+
+local function DisableNoclip()
+    if not NoclipActive then return end
+    NoclipActive = false
+    if NoclipConnection then
+        NoclipConnection:Disconnect()
+        NoclipConnection = nil
+    end
+    local char = LocalPlayer.Character
+    if char then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+    ShowNotification("🔒 Noclip desactivado", 1)
+end
+
+-- ================================
+-- RAGE (Target Strafe)
+-- ================================
+local function UpdateTargetStrafe(dt, targetRoot, rootPart)
+    TargetStrafeAngle = TargetStrafeAngle + (TargetStrafeSpeed * 2 * math.pi * dt)
+    if TargetStrafeAngle > 2 * math.pi then TargetStrafeAngle = TargetStrafeAngle - 2 * math.pi end
+    local angle = TargetStrafeAngle
+    local radius = TargetStrafeRadius
+    local height = TargetStrafeHeight
+    local x, z = 0, 0
+    if TargetStrafePattern == "circle" then
+        x = math.cos(angle) * radius
+        z = math.sin(angle) * radius
+    elseif TargetStrafePattern == "random" then
+        local now = tick()
+        if now - TargetStrafeLastUpdate > 0.2 then
+            TargetStrafeRandomOffset = math.random() * 2 * math.pi
+            TargetStrafeLastUpdate = now
+        end
+        angle = angle + TargetStrafeRandomOffset
+        x = math.cos(angle) * radius
+        z = math.sin(angle) * radius
+    elseif TargetStrafePattern == "figure8" then
+        local t = TargetStrafeAngle
+        x = math.sin(t) * radius
+        z = math.sin(2 * t) * radius
+    elseif TargetStrafePattern == "square" then
+        local t = angle % (2 * math.pi)
+        if t < math.pi/2 then
+            x, z = radius, radius * (t / (math.pi/2))
+        elseif t < math.pi then
+            x, z = radius * (1 - (t-math.pi/2)/(math.pi/2)), radius
+        elseif t < 3*math.pi/2 then
+            x, z = -radius, radius * (1 - (t-math.pi)/(math.pi/2))
+        else
+            x, z = -radius * ((t-3*math.pi/2)/(math.pi/2)), -radius
+        end
+    elseif TargetStrafePattern == "star" then
+        local r = radius * (0.5 + 0.5 * math.sin(5 * angle))
+        x = math.cos(angle) * r
+        z = math.sin(angle) * r
+    elseif TargetStrafePattern == "spiral" then
+        TargetStrafeSpiralT = TargetStrafeSpiralT + dt * TargetStrafeSpeed
+        local r = radius * (TargetStrafeSpiralT % 1)
+        x = math.cos(angle * 2) * r
+        z = math.sin(angle * 2) * r
+    end
+    local targetPos = targetRoot.Position + Vector3.new(x, height, z)
+    rootPart.CFrame = CFrame.new(targetPos, targetRoot.Position)
+    rootPart.AssemblyLinearVelocity = Vector3.zero
+end
+
+local function PerformStompOnManualTarget()
+    if not ManualTarget or not ManualTarget.Character then 
+        IsFinishing = false
+        return 
+    end
+    local targetChar = ManualTarget.Character
+    local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
+    if not humanoid or humanoid.Health > 0 then
+        IsFinishing = false
+        return
+    end
+    IsFinishing = true
+    StompCooldown = true
+    ShowNotification("💀 INTENTANDO STOMP en " .. ManualTarget.Name, 1.2)
+    local character = LocalPlayer.Character
+    if not character then 
+        IsFinishing = false 
+        StompCooldown = false
+        return 
+    end
+    local myRoot = GetRootPart(character)
+    local bodyRoot = GetRootPart(targetChar)
+    if myRoot and bodyRoot then
+        local rayOrigin = bodyRoot.Position + Vector3.new(0, 12, 0)
+        local rayDirection = Vector3.new(0, -40, 0)
+        local ray = Ray.new(rayOrigin, rayDirection)
+        local hit, pos = workspace:FindPartOnRayWithIgnoreList(ray, {character, targetChar})
+        local stompY = pos and (pos.Y + 3.2) or (bodyRoot.Position.Y + 2.8)
+        local stompPos = Vector3.new(bodyRoot.Position.X, stompY, bodyRoot.Position.Z)
+        myRoot.CFrame = CFrame.new(stompPos)
+        myRoot.AssemblyLinearVelocity = Vector3.new(0, 18, 0)
+        task.wait(0.09)
+        for i = 1, 4 do
+            VirtualInput:SendKeyEvent(true, StompKey, false, game)
+            task.wait(0.03)
+            VirtualInput:SendKeyEvent(false, StompKey, false, game)
+            task.wait(0.04)
+        end
+        ShowNotification("✅ STOMP EJECUTADO en " .. ManualTarget.Name, 1.3)
+    else
+        ShowNotification("❌ No se pudo encontrar el cuerpo para stomp", 1)
+    end
+    task.wait(1.8)
+    IsFinishing = false
+    StompCooldown = false
+end
+
+local function PauseRageMode()
+    WasStrafeActive = TargetStrafeEnabled
+    TargetStrafeEnabled = false
+    DisableNoclip()
+end
+
+local function ResumeRageMode()
+    if WasStrafeActive then
+        TargetStrafeEnabled = true
+        EnableNoclip()
+        ShowNotification("🔄 Target Strafe reactivado", 1)
+    end
+    WasStrafeActive = false
+end
+
+local function UpdateRageModes(dt)
+    if not ManualTarget or not ManualTarget.Character then return end
+    local target = ManualTarget
+    local targetRoot = GetRootPart(target.Character)
+    if not targetRoot then return end
+    local character = LocalPlayer.Character
+    if not character then return end
+    local rootPart = GetRootPart(character)
+    if not rootPart then return end
+    if IsDead(target.Character) then
+        if FinisherEnabled and not IsFinishing and not StompCooldown then
+            StompCooldown = true
+            DeadTarget = target.Character
+            if TargetStrafeEnabled then 
+                PauseRageMode() 
+            end
+            PerformStompOnManualTarget()
+            task.wait(2.2)
+            if WasStrafeActive then 
+                ResumeRageMode() 
+            end
+            StompCooldown = false
+        end
+        return
+    else
+        if DeadTarget == target.Character then
+            DeadTarget = nil
+            if WasStrafeActive and not TargetStrafeEnabled then ResumeRageMode() end
+        end
+    end
+    if not TargetStrafeEnabled then return end
+    UpdateTargetStrafe(dt, targetRoot, rootPart)
+end
+
+-- ================================
+-- FUNCIONALIDADES RAGE (SIN BULLET TP)
+-- ================================
+
+-- ANTI LOCK (Network Sleep)
+local AntiLockEnabled = false
+local AntiLockConnection = nil
+local function StartAntiLock()
+    if AntiLockConnection then return end
+    pcall(function() setfflag("S2PhysicsSenderRate", 2) end)
+    AntiLockConnection = RunService.Heartbeat:Connect(function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = LocalPlayer.Character.HumanoidRootPart
+            pcall(function()
+                sethiddenproperty(hrp, "NetworkIsSleeping", true)
+                task.wait()
+                sethiddenproperty(hrp, "NetworkIsSleeping", false)
+            end)
+        end
+    end)
+end
+local function StopAntiLock()
+    if AntiLockConnection then
+        AntiLockConnection:Disconnect()
+        AntiLockConnection = nil
+    end
+    pcall(function() setfflag("S2PhysicsSenderRate", 13) end)
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        pcall(function() sethiddenproperty(LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false) end)
+    end
+end
+
+-- SPINBOT
+local SpinBotEnabled = false
+local SpinBotSpeed = 50
+
+-- DESYNC INVISIBLE
+local DesyncEnabled = false
+local DesyncParts = {}
+local function StartDesync()
+    DesyncEnabled = true
+    local char = LocalPlayer.Character
+    if not char then return end
+    DesyncParts = {}
+    for _,v in pairs(char:GetDescendants()) do
+        if v:IsA("BasePart") and v.Transparency == 0 then
+            table.insert(DesyncParts, v)
+        end
+    end
+    for _,v in pairs(DesyncParts) do v.Transparency = 0.5 end
+end
+local function StopDesync()
+    DesyncEnabled = false
+    for _,v in pairs(DesyncParts) do
+        if v and v.Parent then v.Transparency = 0 end
+    end
+    DesyncParts = {}
+end
+
+-- CFRAME SPEED
+local CFrameSpeedEnabled = false
+local CFrameSpeedValue = 18
+local CFrameSpeedConnection = nil
+local function StartCFrameSpeed()
+    if CFrameSpeedConnection then return end
+    CFrameSpeedConnection = RunService.RenderStepped:Connect(function()
+        if not CFrameSpeedEnabled then return end
+        local char = LocalPlayer.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildWhichIsA("Humanoid")
+        if not hrp or not hum then return end
+        if hum.MoveDirection.Magnitude > 0 then
+            hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (CFrameSpeedValue / 10))
+        end
+    end)
+end
+local function StopCFrameSpeed()
+    if CFrameSpeedConnection then
+        CFrameSpeedConnection:Disconnect()
+        CFrameSpeedConnection = nil
+    end
+end
+
+-- ================================
+-- AURA
+-- ================================
+local function UpdateAuraTransparency()
+    local seq = NumberSequence.new(AuraTransparency)
+    for _, emitter in ipairs(AllEmitters) do
+        if emitter and emitter.Parent then
+            emitter.Transparency = seq
+        end
+    end
+end
+
+local function ApplyAura(designName)
+    for _, obj in ipairs(CurrentAuraParts) do
+        if obj and obj.Parent then obj:Destroy() end
+    end
+    CurrentAuraParts = {}
+    AllEmitters = {}
+    if not AuraEnabled then return end
+    local character = LocalPlayer.Character
+    if not character then return end
+    local assetId = AURA_DESIGNS[designName]
+    if not assetId then return end
+    local success, auraModel = pcall(function() return game:GetObjects(assetId)[1] end)
+    if not success or not auraModel then
+        warn("No se pudo cargar el aura:", assetId)
+        return
+    end
+    for _, modelPart in ipairs(auraModel:GetChildren()) do
+        local targetPart = character:FindFirstChild(modelPart.Name) or character:FindFirstChild(string.gsub(modelPart.Name, " ", ""))
+        if targetPart then
+            for _, child in ipairs(modelPart:GetChildren()) do
+                local clone = child:Clone()
+                clone.Parent = targetPart
+                table.insert(CurrentAuraParts, clone)
+            end
+        end
+    end
+    auraModel:Destroy()
+    for _, obj in ipairs(CurrentAuraParts) do
+        if obj and obj.Parent then
+            for _, emitter in ipairs(obj:GetDescendants()) do
+                if emitter:IsA("ParticleEmitter") then
+                    table.insert(AllEmitters, emitter)
+                end
+            end
+        end
+    end
+    UpdateAuraTransparency()
+end
+
+local function SetAuraEnabled(enabled)
+    AuraEnabled = enabled
+    if AuraEnabled then
+        ApplyAura(CurrentAuraDesign)
+        ShowNotification("✨ Aura activada: " .. CurrentAuraDesign, 1)
+    else
+        for _, obj in ipairs(CurrentAuraParts) do
+            if obj and obj.Parent then obj:Destroy() end
+        end
+        CurrentAuraParts = {}
+        AllEmitters = {}
+        ShowNotification("✨ Aura desactivada", 1)
+    end
+end
+
+local function SetAuraDesign(designName)
+    CurrentAuraDesign = designName
+    if AuraEnabled then
+        ApplyAura(designName)
+        ShowNotification("🎨 Aura cambiada a: " .. designName, 1)
+    end
+end
+
+local function SetAuraTransparency(value)
+    AuraTransparency = math.clamp(value, 0, 1)
+    if AuraEnabled then UpdateAuraTransparency() end
+end
+
+-- ================================
+-- LISTA DE JUGADORES
+-- ================================
+local function RefreshPlayerList()
+    if not PlayerListScrollingFrame then return end
+    for _, child in ipairs(PlayerListScrollingFrame:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    local players = Players:GetPlayers()
+    table.sort(players, function(a,b) return a.Name < b.Name end)
+    local yOffset = 5
+    for _, plr in ipairs(players) do
+        if plr ~= LocalPlayer then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 24)
+            btn.Position = UDim2.new(0, 5, 0, yOffset)
+            btn.BackgroundColor3 = Color3.fromRGB(40,40,50)
+            btn.Text = plr.Name
+            btn.TextColor3 = Color3.fromRGB(255,255,255)
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 11
+            btn.Parent = PlayerListScrollingFrame
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 5)
+            corner.Parent = btn
+            btn.MouseButton1Click:Connect(function()
+                ManualTarget = plr
+                ShowNotification("🎯 Objetivo manual: " .. plr.Name, 1.5)
+                for _, b in ipairs(PlayerListScrollingFrame:GetChildren()) do
+                    if b:IsA("TextButton") then b.BackgroundColor3 = Color3.fromRGB(40,40,50) end
+                end
+                btn.BackgroundColor3 = Color3.fromRGB(80,120,80)
+            end)
+            yOffset = yOffset + 28
+        end
+    end
+    PlayerListScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, yOffset + 10)
+end
+
+-- ================================
+-- FUNCIONES DE GUI (ULTRA COMPACTAS)
+-- ================================
+local function CreateNumberInput(parent, xPos, yPos, width, labelText, initialValue, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, width, 0, 24)
+    frame.Position = UDim2.new(0, xPos, 0, yPos)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -5, 0.3, 0)
+    label.Position = UDim2.new(0, 0, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(200,200,200)
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 8
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    local inputBox = Instance.new("TextBox")
+    inputBox.Size = UDim2.new(1, 0, 0.6, 0)
+    inputBox.Position = UDim2.new(0, 0, 0.35, 0)
+    inputBox.BackgroundColor3 = Color3.fromRGB(30,30,35)
+    inputBox.Text = tostring(initialValue)
+    inputBox.TextColor3 = Color3.new(1,1,1)
+    inputBox.Font = Enum.Font.Gotham
+    inputBox.TextSize = 8
+    inputBox.ClearTextOnFocus = false
+    inputBox.Parent = frame
+    local inputCorner = Instance.new("UICorner")
+    inputCorner.CornerRadius = UDim.new(0, 3)
+    inputCorner.Parent = inputBox
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(70,70,80)
+    stroke.Thickness = 1
+    stroke.Parent = inputBox
+    local lastValidText = tostring(initialValue)
+    inputBox.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            local num = tonumber(inputBox.Text)
+            if num ~= nil then
+                lastValidText = inputBox.Text
+                callback(num)
+            else
+                inputBox.Text = lastValidText
+            end
+        end
+    end)
+    return {frame, inputBox}
+end
+
+local function CreateCheckbox(parent, xPos, yPos, width, text, defaultValue, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, width, 0, 20)
+    frame.Position = UDim2.new(0, xPos, 0, yPos)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+    local checkBox = Instance.new("ImageLabel")
+    checkBox.Size = UDim2.new(0, 14, 0, 14)
+    checkBox.Position = UDim2.new(0, 0, 0.5, -7)
+    checkBox.BackgroundColor3 = Color3.fromRGB(40,40,45)
+    checkBox.Image = defaultValue and "rbxassetid://3926305904" or ""
+    checkBox.ScaleType = Enum.ScaleType.Fit
+    checkBox.Parent = frame
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 3)
+    corner.Parent = checkBox
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -18, 1, 0)
+    label.Position = UDim2.new(0, 18, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(220,220,220)
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 9
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    local value = defaultValue
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 1, 0)
+    button.BackgroundTransparency = 1
+    button.Text = ""
+    button.Parent = frame
+    button.MouseButton1Click:Connect(function()
+        value = not value
+        checkBox.Image = value and "rbxassetid://3926305904" or ""
+        callback(value)
+    end)
+    return {frame, checkBox, value}
+end
+
+local function CreateButton(parent, xPos, yPos, width, text, bgColor, callback, hoverColor)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, width, 0, 22)
+    btn.Position = UDim2.new(0, xPos, 0, yPos)
+    btn.BackgroundColor3 = bgColor or Color3.fromRGB(45,45,55)
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 9
+    btn.Parent = parent
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 4)
+    corner.Parent = btn
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(80,80,90)
+    stroke.Thickness = 1
+    stroke.Parent = btn
+    local originalColor = bgColor or Color3.fromRGB(45,45,55)
+    local hover = hoverColor or Color3.fromRGB(70,70,85)
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Sine), {BackgroundColor3 = hover}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Sine), {BackgroundColor3 = originalColor}):Play()
+    end)
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+local function CreateCycleDropdown(parent, xPos, yPos, width, text, options, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, width, 0, 22)
+    frame.Position = UDim2.new(0, xPos, 0, yPos)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0, width*0.4, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(220,220,220)
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 9
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    
+    local currentIndex = table.find(options, default) or 1
+    local current = options[currentIndex]
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, width*0.6, 1, 0)
+    btn.Position = UDim2.new(0, width*0.4, 0, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(40,40,50)
+    btn.Text = current
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 8
+    btn.Parent = frame
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 4)
+    corner.Parent = btn
+    
+    btn.MouseButton1Click:Connect(function()
+        currentIndex = currentIndex + 1
+        if currentIndex > #options then currentIndex = 1 end
+        current = options[currentIndex]
+        btn.Text = current
+        callback(current)
+    end)
+    
+    return {frame, btn}
+end
+
+-- Selector de color cíclico (8 colores predefinidos)
+local function CreateCycleColorPicker(parent, xPos, yPos, width, text, defaultColor, callback)
+    local colors = {
+        Color3.fromRGB(255, 255, 255), -- Blanco
+        Color3.fromRGB(255, 0, 0),     -- Rojo
+        Color3.fromRGB(0, 255, 0),     -- Verde
+        Color3.fromRGB(0, 0, 255),     -- Azul
+        Color3.fromRGB(255, 255, 0),   -- Amarillo
+        Color3.fromRGB(0, 255, 255),   -- Cian
+        Color3.fromRGB(255, 0, 255),   -- Magenta
+        Color3.fromRGB(128, 128, 128)  -- Gris
+    }
+    
+    local currentIndex = 1
+    for i, c in ipairs(colors) do
+        if c.R == defaultColor.R and c.G == defaultColor.G and c.B == defaultColor.B then
+            currentIndex = i
+            break
+        end
+    end
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, width, 0, 22)
+    frame.Position = UDim2.new(0, xPos, 0, yPos)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0, width*0.4, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(220,220,220)
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 9
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    local colorBox = Instance.new("Frame")
+    colorBox.Size = UDim2.new(0, 18, 0, 18)
+    colorBox.Position = UDim2.new(0, width*0.4, 0.5, -9)
+    colorBox.BackgroundColor3 = defaultColor
+    colorBox.BorderSizePixel = 0
+    colorBox.Parent = frame
+    local boxCorner = Instance.new("UICorner")
+    boxCorner.CornerRadius = UDim.new(0, 3)
+    boxCorner.Parent = colorBox
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, width*0.55, 1, 0)
+    btn.Position = UDim2.new(0, width*0.45, 0, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(40,40,50)
+    btn.Text = "Cambiar"
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 8
+    btn.Parent = frame
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 4)
+    btnCorner.Parent = btn
+
+    btn.MouseButton1Click:Connect(function()
+        currentIndex = currentIndex + 1
+        if currentIndex > #colors then currentIndex = 1 end
+        local newColor = colors[currentIndex]
+        colorBox.BackgroundColor3 = newColor
+        callback(newColor)
+    end)
+
+    return {frame, colorBox, btn}
+end
+
+-- ================================
+-- BOTONES EXTERNOS
+-- ================================
+local function CreateToggleGuiButton()
+    if ToggleGuiButton then return end
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+    local screenGui = playerGui:FindFirstChild("ExternalButtons") or Instance.new("ScreenGui")
+    screenGui.Name = "ExternalButtons"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = playerGui
+    local btn = Instance.new("ImageButton")
+    btn.Size = UDim2.new(0, 64, 0, 64)
+    btn.Position = UDim2.new(0.02, 0, 0.02, 0)
+    btn.BackgroundTransparency = 1
+    btn.Image = "rbxassetid://97318186884444"
+    btn.Parent = screenGui
+    btn.Draggable = true
+    btn.Active = true
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = btn
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(100,100,110)
+    stroke.Thickness = 2
+    stroke.Parent = btn
+    btn.MouseButton1Click:Connect(function()
+        if MainGUI then MainGUI.Enabled = not MainGUI.Enabled end
+    end)
+    ToggleGuiButton = btn
+end
+
+local function CreateLockButton()
+    if MainExternalButton then return end
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+    local screenGui = playerGui:FindFirstChild("ExternalButtons") or (function()
+        local sg = Instance.new("ScreenGui")
+        sg.Name = "ExternalButtons"
+        sg.ResetOnSpawn = false
+        sg.Parent = playerGui
+        return sg
+    end)()
+    
+    local btn = Instance.new("ImageButton")
+    btn.Size = UDim2.new(0, 80, 0, 80)
+    btn.Position = UDim2.new(0.91, 0, 0.65, 0)
+    btn.BackgroundTransparency = 1
+    btn.Image = "rbxassetid://284402785"
+    btn.Parent = screenGui
+    btn.Draggable = true
+    btn.Active = true
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 0)
+    corner.Parent = btn
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(100, 100, 110)
+    stroke.Thickness = 2
+    stroke.Parent = btn
+    
+    btn.MouseButton1Click:Connect(function()
+        MasterEnabled = not MasterEnabled
+        if MainExternalButton then
+            MainExternalButton.Image = MasterEnabled and "rbxassetid://284402752" or "rbxassetid://284402785"
+        end
+        UpdateEnabledStates()
+    end)
+    
+    MainExternalButton = btn
+    UpdateEnabledStates()
+end
+
+local function CreateWalkspeedButton()
+    if WalkspeedExternalButton then return end
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+    local screenGui = playerGui:FindFirstChild("ExternalButtons") or (function()
+        local sg = Instance.new("ScreenGui")
+        sg.Name = "ExternalButtons"
+        sg.ResetOnSpawn = false
+        sg.Parent = playerGui
+        return sg
+    end)()
+    local btn = Instance.new("ImageButton")
+    btn.Size = UDim2.new(0, 64, 0, 64)
+    btn.Position = UDim2.new(0.91, 0, 0.77, 0)
+    btn.BackgroundTransparency = 1
+    btn.Image = "rbxassetid://8167283965"
+    btn.Parent = screenGui
+    btn.Draggable = true
+    btn.Active = true
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = btn
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(100,100,110)
+    stroke.Thickness = 2
+    stroke.Parent = btn
+    btn.MouseButton1Click:Connect(function()
+        MacroSpeedEnabled = not MacroSpeedEnabled
+        btn.Image = MacroSpeedEnabled and "rbxassetid://6724857700" or "rbxassetid://8167283965"
+        if WalkspeedBtn then WalkspeedBtn.Text = "Walkspeed: " .. (MacroSpeedEnabled and "ON" or "OFF") end
+        UpdateWalkspeed()
+    end)
+    WalkspeedExternalButton = btn
+end
+
+local function CreateMacroButton()
+    if MacroExternalButton then return end
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+    local screenGui = playerGui:FindFirstChild("ExternalButtons") or (function()
+        local sg = Instance.new("ScreenGui")
+        sg.Name = "ExternalButtons"
+        sg.ResetOnSpawn = false
+        sg.Parent = playerGui
+        return sg
+    end)()
+    local btn = Instance.new("ImageButton")
+    btn.Size = UDim2.new(0, 64, 0, 64)
+    btn.Position = UDim2.new(0.91, 0, 0.89, 0)
+    btn.BackgroundTransparency = 1
+    btn.Image = "rbxassetid://8167283965"
+    btn.Parent = screenGui
+    btn.Draggable = true
+    btn.Active = true
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = btn
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(100,100,110)
+    stroke.Thickness = 2
+    stroke.Parent = btn
+    btn.MouseButton1Click:Connect(function()
+        MacroEnabled = not MacroEnabled
+        btn.Image = MacroEnabled and "rbxassetid://6724857700" or "rbxassetid://8167283965"
+        if MacroBtn then MacroBtn.Text = "Macro: " .. (MacroEnabled and "ON" or "OFF") end
+        UpdateMacro()
+    end)
+    MacroExternalButton = btn
+end
+
+-- ================================
+-- GUI PRINCIPAL (ULTRA COMPACTA)
+-- ================================
+local function CreateGUI()
+    if MainGUI then return end
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "DEX.CC"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    MainGUI = screenGui
+    MainGUI.Enabled = false
+    
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 560, 0, 480)
+    mainFrame.Position = UDim2.new(0.02, 0, 0.05, 0)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(12,12,16)
+    mainFrame.BackgroundTransparency = 0.1
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Draggable = true
+    mainFrame.Parent = screenGui
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = mainFrame
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(60,60,70)
+    stroke.Thickness = 1.5
+    stroke.Transparency = 0.4
+    stroke.Parent = mainFrame
+    
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, 0, 0, 26)
+    header.Position = UDim2.new(0, 0, 0, 0)
+    header.BackgroundColor3 = Color3.fromRGB(20,20,25)
+    header.BackgroundTransparency = 0.2
+    header.Parent = mainFrame
+    local headerCorner = Instance.new("UICorner")
+    headerCorner.CornerRadius = UDim.new(0, 12)
+    headerCorner.Parent = header
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 1, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "DEX.CC"
+    title.TextColor3 = Color3.fromRGB(220,220,230)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 12
+    title.Parent = header
+    
+    local tabContainer = Instance.new("Frame")
+    tabContainer.Size = UDim2.new(1, 0, 0, 22)
+    tabContainer.Position = UDim2.new(0, 0, 0, 26)
+    tabContainer.BackgroundTransparency = 1
+    tabContainer.Parent = mainFrame
+    
+    local contentContainer = Instance.new("Frame")
+    contentContainer.Size = UDim2.new(1, -14, 1, -58)
+    contentContainer.Position = UDim2.new(0, 7, 0, 52)
+    contentContainer.BackgroundTransparency = 1
+    contentContainer.Parent = mainFrame
+    
+    local function CreateScrollPanel(name)
+        local scroll = Instance.new("ScrollingFrame")
+        scroll.Size = UDim2.new(1, 0, 1, 0)
+        scroll.Position = UDim2.new(0, 0, 0, 0)
+        scroll.BackgroundTransparency = 1
+        scroll.BorderSizePixel = 0
+        scroll.ScrollBarThickness = 4
+        scroll.ScrollBarImageColor3 = Color3.fromRGB(80,80,90)
+        scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        scroll.Name = name
+        scroll.Parent = contentContainer
+        scroll.Visible = false
+        local padding = Instance.new("UIPadding")
+        padding.PaddingLeft = UDim.new(0, 2)
+        padding.PaddingRight = UDim.new(0, 2)
+        padding.PaddingTop = UDim.new(0, 2)
+        padding.PaddingBottom = UDim.new(0, 2)
+        padding.Parent = scroll
+        return scroll
+    end
+    
+    local panelAimbot = CreateScrollPanel("Aimbot")
+    local panelAir = CreateScrollPanel("Air")
+    local panelEspMisc = CreateScrollPanel("EspMisc")
+    local panelRage = CreateScrollPanel("Rage")
+    local panelVisual = CreateScrollPanel("Visual")
+    local panelPlayerList = CreateScrollPanel("PlayerList")
+    
+    local function CreateTab(name, panel, xPos, width)
+        width = width or 75
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, width, 1, -2)
+        btn.Position = UDim2.new(0, xPos, 0, 1)
+        btn.BackgroundColor3 = Color3.fromRGB(30,30,36)
+        btn.Text = name
+        btn.TextColor3 = Color3.fromRGB(200,200,210)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 9
+        btn.Parent = tabContainer
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 5)
+        btnCorner.Parent = btn
+        btn.MouseButton1Click:Connect(function()
+            panelAimbot.Visible = false
+            panelAir.Visible = false
+            panelEspMisc.Visible = false
+            panelRage.Visible = false
+            panelVisual.Visible = false
+            panelPlayerList.Visible = false
+            panel.Visible = true
+            for _, child in ipairs(tabContainer:GetChildren()) do
+                if child:IsA("TextButton") then
+                    child.BackgroundColor3 = Color3.fromRGB(30,30,36)
+                    child.TextColor3 = Color3.fromRGB(200,200,210)
+                end
+            end
+            btn.BackgroundColor3 = Color3.fromRGB(55,55,70)
+            btn.TextColor3 = Color3.fromRGB(255,255,255)
+        end)
+        return btn
+    end
+    
+    CreateTab("AIMBOT", panelAimbot, 5, 70)
+    CreateTab("AIR", panelAir, 80, 55)
+    CreateTab("ESP", panelEspMisc, 140, 55)
+    CreateTab("RAGE", panelRage, 200, 65)
+    CreateTab("VISUAL", panelVisual, 270, 70)
+    CreateTab("LIST", panelPlayerList, 345, 55)
+    
+    local colW = 230
+    local col1_x = 5
+    local col2_x = col1_x + colW + 6
+    
+    -- ========== AIMBOT ==========
+    local aimbotY = 2
+    
+    CreateCheckbox(panelAimbot, col1_x, aimbotY, colW, "Camlock", true, function(val)
+        CamlockSelected = val
+        UpdateEnabledStates()
+    end)
+    CreateCheckbox(panelAimbot, col2_x, aimbotY, colW, "Silent Aim", true, function(val)
+        SilentSelected = val
+        UpdateEnabledStates()
+    end)
+    aimbotY = aimbotY + 22
+    
+    CreateCheckbox(panelAimbot, col1_x, aimbotY, colW, "Silent FOV", IndependentSilentEnabled, function(val)
+        IndependentSilentEnabled = val
+    end)
+    aimbotY = aimbotY + 24
+    
+    local groundLabel = Instance.new("TextLabel")
+    groundLabel.Size = UDim2.new(0, colW, 0, 14)
+    groundLabel.Position = UDim2.new(0, col1_x, 0, aimbotY)
+    groundLabel.BackgroundTransparency = 1
+    groundLabel.Text = "Ground: " .. GroundAimPart
+    groundLabel.TextColor3 = Color3.fromRGB(220,220,230)
+    groundLabel.Font = Enum.Font.GothamSemibold
+    groundLabel.TextSize = 8
+    groundLabel.TextXAlignment = Enum.TextXAlignment.Left
+    groundLabel.Parent = panelAimbot
+    
+    CreateButton(panelAimbot, col1_x, aimbotY + 14, 35, "◀", Color3.fromRGB(45,45,55), function()
+        GroundPartIndex = GroundPartIndex - 1
+        if GroundPartIndex < 1 then GroundPartIndex = #GroundPartList end
+        GroundAimPart = GroundPartList[GroundPartIndex]
+        groundLabel.Text = "Ground: " .. GroundAimPart
+    end)
+    CreateButton(panelAimbot, col1_x + colW - 35, aimbotY + 14, 35, "▶", Color3.fromRGB(45,45,55), function()
+        GroundPartIndex = GroundPartIndex + 1
+        if GroundPartIndex > #GroundPartList then GroundPartIndex = 1 end
+        GroundAimPart = GroundPartList[GroundPartIndex]
+        groundLabel.Text = "Ground: " .. GroundAimPart
+    end)
+    aimbotY = aimbotY + 36
+    
+    CreateNumberInput(panelAimbot, col1_x, aimbotY, colW, "FOV:", FOVRadius, function(val) FOVRadius = val; if FOVCircle then FOVCircle.Radius = FOVRadius end end)
+    CreateNumberInput(panelAimbot, col2_x, aimbotY, colW, "Smooth:", SmoothingSpeed, function(val) SmoothingSpeed = val end)
+    aimbotY = aimbotY + 28
+    
+    CreateCycleDropdown(panelAimbot, col1_x, aimbotY, colW, "Pred:", {"Manual", "PingBased", "Blatant"}, "PingBased", function(val)
+        PredictionMode = val
+        UpdatePrediction()
+    end)
+    aimbotY = aimbotY + 26
+    
+    CreateNumberInput(panelAimbot, col1_x, aimbotY, colW, "Base:", BasePrediction, function(val) BasePrediction = val; UpdatePrediction() end)
+    CreateNumberInput(panelAimbot, col2_x, aimbotY, colW, "Value:", PredictionValue, function(val)
+        PredictionValue = val
+        if PredictionMode == "Manual" then UpdatePrediction() end
+    end)
+    aimbotY = aimbotY + 28
+    
+    CreateNumberInput(panelAimbot, col1_x, aimbotY, colW, "Hit %:", SilentHitChance, function(val) SilentHitChance = val end)
+    aimbotY = aimbotY + 28
+    
+    CreateCheckbox(panelAimbot, col1_x, aimbotY, colW, "Wall Check", WallCheckEnabled, function(val) WallCheckEnabled = val end)
+    aimbotY = aimbotY + 22
+    
+    CreateCheckbox(panelAimbot, col1_x, aimbotY, colW, "Resolver", ResolverEnabled, function(val) ResolverEnabled = val end)
+    aimbotY = aimbotY + 22
+    
+    CreateCycleDropdown(panelAimbot, col1_x, aimbotY, colW, "Mode:", {"Velocity", "MoveDirection", "TimeBased"}, "Velocity", function(val) ResolverMode = val end)
+    aimbotY = aimbotY + 26
+    
+    CreateCheckbox(panelAimbot, col1_x, aimbotY, colW, "No Ground", NoGroundShotEnabled, function(val) NoGroundShotEnabled = val end)
+    aimbotY = aimbotY + 22
+    
+    CreateCheckbox(panelAimbot, col1_x, aimbotY, colW, "Pred Circle", PredictionCircleEnabled, function(val)
+        PredictionCircleEnabled = val
+        if not val and PredictionCircle then PredictionCircle.Visible = false end
+    end)
+    aimbotY = aimbotY + 26
+    
+    panelAimbot.CanvasSize = UDim2.new(0, 0, 0, aimbotY + 5)
+    
+    -- ========== AIR ==========
+    local airY = 2
+    CreateCheckbox(panelAir, col1_x, airY, colW, "Auto Airshot", false, function(val) AutoAirshotEnabled = val end)
+    CreateNumberInput(panelAir, col2_x, airY, colW, "Delay:", AirDelay, function(val) AirDelay = val end)
+    airY = airY + 28
+    
+    local airLabel = Instance.new("TextLabel")
+    airLabel.Size = UDim2.new(0, colW, 0, 14)
+    airLabel.Position = UDim2.new(0, col1_x, 0, airY)
+    airLabel.BackgroundTransparency = 1
+    airLabel.Text = "Air: " .. AirAimPart
+    airLabel.TextColor3 = Color3.fromRGB(220,220,230)
+    airLabel.Font = Enum.Font.GothamSemibold
+    airLabel.TextSize = 8
+    airLabel.TextXAlignment = Enum.TextXAlignment.Left
+    airLabel.Parent = panelAir
+    
+    CreateButton(panelAir, col1_x, airY + 14, 35, "◀", Color3.fromRGB(45,45,55), function()
+        AirPartIndex = AirPartIndex - 1
+        if AirPartIndex < 1 then AirPartIndex = #AirPartList end
+        AirAimPart = AirPartList[AirPartIndex]
+        airLabel.Text = "Air: " .. AirAimPart
+    end)
+    CreateButton(panelAir, col1_x + colW - 35, airY + 14, 35, "▶", Color3.fromRGB(45,45,55), function()
+        AirPartIndex = AirPartIndex + 1
+        if AirPartIndex > #AirPartList then AirPartIndex = 1 end
+        AirAimPart = AirPartList[AirPartIndex]
+        airLabel.Text = "Air: " .. AirAimPart
+    end)
+    airY = airY + 36
+    
+    CreateNumberInput(panelAir, col1_x, airY, colW, "Jump:", JumpOffset, function(val) JumpOffset = val end)
+    CreateNumberInput(panelAir, col2_x, airY, colW, "Fall:", FallOffset, function(val) FallOffset = val end)
+    airY = airY + 28
+    
+    panelAir.CanvasSize = UDim2.new(0, 0, 0, airY + 5)
+    
+    -- ========== ESP/MISC ==========
+    local miscY = 2
+    CreateCheckbox(panelEspMisc, col1_x, miscY, colW, "ESP", ESPEnabled, function(val) ESPEnabled = val end)
+    miscY = miscY + 22
+    
+    local highlightBtn = CreateButton(panelEspMisc, col1_x, miscY, colW-5, "3D", Color3.fromRGB(45,45,55), function()
+        ESPMode = "Highlight"
+        highlightBtn.BackgroundColor3 = Color3.fromRGB(75,75,90)
+        nameBtn.BackgroundColor3 = Color3.fromRGB(45,45,55)
+        box2dBtn.BackgroundColor3 = Color3.fromRGB(45,45,55)
+        if ESP2D.Frame then ESP2D.Frame.Visible = false end
+    end)
+    local nameBtn = CreateButton(panelEspMisc, col2_x+5, miscY, colW-5, "Name", Color3.fromRGB(45,45,55), function()
+        ESPMode = "Name"
+        nameBtn.BackgroundColor3 = Color3.fromRGB(75,75,90)
+        highlightBtn.BackgroundColor3 = Color3.fromRGB(45,45,55)
+        box2dBtn.BackgroundColor3 = Color3.fromRGB(45,45,55)
+        if ESP2D.Frame then ESP2D.Frame.Visible = false end
+    end)
+    local box2dBtn = CreateButton(panelEspMisc, col1_x, miscY + 24, colW, "2D Box", Color3.fromRGB(45,45,55), function()
+        ESPMode = "2DBox"
+        box2dBtn.BackgroundColor3 = Color3.fromRGB(75,75,90)
+        highlightBtn.BackgroundColor3 = Color3.fromRGB(45,45,55)
+        nameBtn.BackgroundColor3 = Color3.fromRGB(45,45,55)
+        Create2DESP()
+    end)
+    highlightBtn.BackgroundColor3 = Color3.fromRGB(75,75,90)
+    miscY = miscY + 50
+    
+    CreateNumberInput(panelEspMisc, col1_x, miscY, colW, "WS:", MacroSpeedValue, function(val) MacroSpeedValue = val; if MacroSpeedEnabled then UpdateWalkspeed() end end)
+    miscY = miscY + 28
+    
+    WalkspeedBtn = CreateButton(panelEspMisc, col1_x, miscY, colW, "WS: OFF", Color3.fromRGB(45,45,55), function()
+        MacroSpeedEnabled = not MacroSpeedEnabled
+        WalkspeedBtn.Text = "WS: " .. (MacroSpeedEnabled and "ON" or "OFF")
+        if WalkspeedExternalButton then WalkspeedExternalButton.Image = MacroSpeedEnabled and "rbxassetid://6724857700" or "rbxassetid://8167283965" end
+        UpdateWalkspeed()
+    end)
+    MacroBtn = CreateButton(panelEspMisc, col2_x, miscY, colW, "Macro: OFF", Color3.fromRGB(45,45,55), function()
+        MacroEnabled = not MacroEnabled
+        MacroBtn.Text = "Macro: " .. (MacroEnabled and "ON" or "OFF")
+        if MacroExternalButton then MacroExternalButton.Image = MacroEnabled and "rbxassetid://6724857700" or "rbxassetid://8167283965" end
+        UpdateMacro()
+    end)
+    miscY = miscY + 26
+    
+    CreateButton(panelEspMisc, col1_x, miscY, colW, "Lock Btn", Color3.fromRGB(50,50,60), CreateLockButton)
+    CreateButton(panelEspMisc, col2_x, miscY, colW, "Macro Btn", Color3.fromRGB(50,50,60), CreateMacroButton)
+    miscY = miscY + 26
+    CreateButton(panelEspMisc, col1_x, miscY, colW, "WS Btn", Color3.fromRGB(50,50,60), CreateWalkspeedButton)
+    miscY = miscY + 30
+    
+    panelEspMisc.CanvasSize = UDim2.new(0, 0, 0, miscY + 5)
+    
+    -- ========== RAGE ==========
+    local rageY = 2
+    local colW2 = 230
+    local colR1 = 5
+    local colR2 = colR1 + colW2 + 6
+    
+    local strafeHeader = Instance.new("TextLabel")
+    strafeHeader.Size = UDim2.new(0, colW2, 0, 16)
+    strafeHeader.Position = UDim2.new(0, colR1, 0, rageY)
+    strafeHeader.BackgroundTransparency = 1
+    strafeHeader.Text = "🎯 TARGET STRAFE"
+    strafeHeader.TextColor3 = Color3.fromRGB(255,200,100)
+    strafeHeader.Font = Enum.Font.GothamBold
+    strafeHeader.TextSize = 10
+    strafeHeader.TextXAlignment = Enum.TextXAlignment.Left
+    strafeHeader.Parent = panelRage
+    
+    local strafeBtn = CreateButton(panelRage, colR1, rageY + 16, colW2, "Strafe: OFF", Color3.fromRGB(70,40,40), function()
+        if TargetStrafeEnabled then
+            TargetStrafeEnabled = false
+            strafeBtn.Text = "Strafe: OFF"
+            strafeBtn.BackgroundColor3 = Color3.fromRGB(70,40,40)
+            DisableNoclip()
+        else
+            TargetStrafeEnabled = true
+            strafeBtn.Text = "Strafe: ON"
+            strafeBtn.BackgroundColor3 = Color3.fromRGB(100,50,50)
+            EnableNoclip()
+        end
+    end)
+    rageY = rageY + 40
+    
+    CreateNumberInput(panelRage, colR1, rageY, colW2, "Vel:", TargetStrafeSpeed, function(val) TargetStrafeSpeed = math.max(0.5, val) end)
+    CreateNumberInput(panelRage, colR2, rageY, colW2, "Rad:", TargetStrafeRadius, function(val) TargetStrafeRadius = math.max(1, val) end)
+    rageY = rageY + 28
+    CreateNumberInput(panelRage, colR1, rageY, colW2, "Alt:", TargetStrafeHeight, function(val) TargetStrafeHeight = val end)
+    
+    local patternLabel = Instance.new("TextLabel")
+    patternLabel.Size = UDim2.new(0, colW2, 0, 14)
+    patternLabel.Position = UDim2.new(0, colR1, 0, rageY + 28)
+    patternLabel.BackgroundTransparency = 1
+    patternLabel.Text = "Patrón: " .. TargetStrafePattern
+    patternLabel.TextColor3 = Color3.fromRGB(220,220,230)
+    patternLabel.Font = Enum.Font.GothamSemibold
+    patternLabel.TextSize = 8
+    patternLabel.TextXAlignment = Enum.TextXAlignment.Left
+    patternLabel.Parent = panelRage
+    
+    CreateButton(panelRage, colR1, rageY + 42, 35, "◀", Color3.fromRGB(45,45,55), function()
+        local patterns = {"circle", "random", "figure8", "square", "star", "spiral"}
+        local idx = table.find(patterns, TargetStrafePattern) or 1
+        idx = idx - 1
+        if idx < 1 then idx = #patterns end
+        TargetStrafePattern = patterns[idx]
+        patternLabel.Text = "Patrón: " .. TargetStrafePattern
+    end)
+    CreateButton(panelRage, colR1 + colW2 - 35, rageY + 42, 35, "▶", Color3.fromRGB(45,45,55), function()
+        local patterns = {"circle", "random", "figure8", "square", "star", "spiral"}
+        local idx = table.find(patterns, TargetStrafePattern) or 1
+        idx = idx + 1
+        if idx > #patterns then idx = 1 end
+        TargetStrafePattern = patterns[idx]
+        patternLabel.Text = "Patrón: " .. TargetStrafePattern
+    end)
+    rageY = rageY + 68
+    
+    local sep1 = Instance.new("Frame")
+    sep1.Size = UDim2.new(1, -10, 0, 1)
+    sep1.Position = UDim2.new(0, 5, 0, rageY)
+    sep1.BackgroundColor3 = Color3.fromRGB(80,80,90)
+    sep1.BorderSizePixel = 0
+    sep1.Parent = panelRage
+    rageY = rageY + 8
+    
+    local velSpoofHeader = Instance.new("TextLabel")
+    velSpoofHeader.Size = UDim2.new(0, colW2, 0, 16)
+    velSpoofHeader.Position = UDim2.new(0, colR1, 0, rageY)
+    velSpoofHeader.BackgroundTransparency = 1
+    velSpoofHeader.Text = "🛡️ VELOCITY"
+    velSpoofHeader.TextColor3 = Color3.fromRGB(200,150,255)
+    velSpoofHeader.Font = Enum.Font.GothamBold
+    velSpoofHeader.TextSize = 10
+    velSpoofHeader.TextXAlignment = Enum.TextXAlignment.Left
+    velSpoofHeader.Parent = panelRage
+    rageY = rageY + 16
+    
+    local VelocitySpooferEnabled = false
+    local VelocitySpooferMode = "Underground"
+    local VelocitySpooferX, VelocitySpooferY, VelocitySpooferZ = 0, -50, 0
+    
+    CreateCheckbox(panelRage, colR1, rageY, colW2, "Enabled", false, function(val) VelocitySpooferEnabled = val end)
+    rageY = rageY + 22
+    
+    CreateCycleDropdown(panelRage, colR1, rageY, colW2, "Mode:", {"Underground", "Sky", "Prediction Breaker", "Custom"}, "Underground", function(val) VelocitySpooferMode = val end)
+    rageY = rageY + 26
+    
+    CreateNumberInput(panelRage, colR1, rageY, colW2/3-3, "X", VelocitySpooferX, function(v) VelocitySpooferX = v end)
+    CreateNumberInput(panelRage, colR1+colW2/3, rageY, colW2/3-3, "Y", VelocitySpooferY, function(v) VelocitySpooferY = v end)
+    CreateNumberInput(panelRage, colR1+2*colW2/3, rageY, colW2/3-3, "Z", VelocitySpooferZ, function(v) VelocitySpooferZ = v end)
+    rageY = rageY + 28
+    
+    CreateCheckbox(panelRage, colR1, rageY, colW2, "Stomp", FinisherEnabled, function(val) FinisherEnabled = val end)
+    rageY = rageY + 26
+    
+    local sep2 = Instance.new("Frame")
+    sep2.Size = UDim2.new(1, -10, 0, 1)
+    sep2.Position = UDim2.new(0, 5, 0, rageY)
+    sep2.BackgroundColor3 = Color3.fromRGB(80,80,90)
+    sep2.BorderSizePixel = 0
+    sep2.Parent = panelRage
+    rageY = rageY + 8
+    
+    local newRageHeader = Instance.new("TextLabel")
+    newRageHeader.Size = UDim2.new(0, colW2, 0, 16)
+    newRageHeader.Position = UDim2.new(0, colR1, 0, rageY)
+    newRageHeader.BackgroundTransparency = 1
+    newRageHeader.Text = "🔥 AVANZADO"
+    newRageHeader.TextColor3 = Color3.fromRGB(255,150,150)
+    newRageHeader.Font = Enum.Font.GothamBold
+    newRageHeader.TextSize = 10
+    newRageHeader.TextXAlignment = Enum.TextXAlignment.Left
+    newRageHeader.Parent = panelRage
+    rageY = rageY + 16
+    
+    CreateCheckbox(panelRage, colR1, rageY, colW2, "Anti Lock", false, function(val)
+        AntiLockEnabled = val
+        if val then StartAntiLock() else StopAntiLock() end
+    end)
+    rageY = rageY + 22
+    
+    CreateCheckbox(panelRage, colR1, rageY, colW2, "SpinBot", false, function(val)
+        SpinBotEnabled = val
+    end)
+    CreateNumberInput(panelRage, colR2, rageY, colW2, "Speed:", SpinBotSpeed, function(val) SpinBotSpeed = val end)
+    rageY = rageY + 28
+    
+    CreateCheckbox(panelRage, colR1, rageY, colW2, "Desync", false, function(val)
+        if val then StartDesync() else StopDesync() end
+    end)
+    rageY = rageY + 22
+    
+    CreateCheckbox(panelRage, colR1, rageY, colW2, "CFrame", false, function(val)
+        CFrameSpeedEnabled = val
+        if val then StartCFrameSpeed() else StopCFrameSpeed() end
+    end)
+    CreateNumberInput(panelRage, colR2, rageY, colW2, "Speed:", CFrameSpeedValue, function(val) CFrameSpeedValue = val end)
+    rageY = rageY + 28
+    
+    panelRage.CanvasSize = UDim2.new(0, 0, 0, rageY + 5)
+    
+    -- ========== VISUAL (CON COLORES CÍCLICOS Y TOGGLES) ==========
+    local visualY = 2
+    local colWv = 230
+    local colV1 = 5
+    local colV2 = colV1 + colWv + 6
+    
+    local ambientHeader = Instance.new("TextLabel")
+    ambientHeader.Size = UDim2.new(0, colWv, 0, 16)
+    ambientHeader.Position = UDim2.new(0, colV1, 0, visualY)
+    ambientHeader.BackgroundTransparency = 1
+    ambientHeader.Text = "🌎 AMBIENTE"
+    ambientHeader.TextColor3 = Color3.fromRGB(150,255,150)
+    ambientHeader.Font = Enum.Font.GothamBold
+    ambientHeader.TextSize = 10
+    ambientHeader.TextXAlignment = Enum.TextXAlignment.Left
+    ambientHeader.Parent = panelVisual
+    visualY = visualY + 16
+    
+    CreateCycleColorPicker(panelVisual, colV1, visualY, colWv, "Color:", AmbientColor, function(c) SetAmbientColor(c) end)
+    visualY = visualY + 28
+    
+    local skyHeader = Instance.new("TextLabel")
+    skyHeader.Size = UDim2.new(0, colWv, 0, 16)
+    skyHeader.Position = UDim2.new(0, colV1, 0, visualY)
+    skyHeader.BackgroundTransparency = 1
+    skyHeader.Text = "🌌 SKYBOX"
+    skyHeader.TextColor3 = Color3.fromRGB(150,200,255)
+    skyHeader.Font = Enum.Font.GothamBold
+    skyHeader.TextSize = 10
+    skyHeader.TextXAlignment = Enum.TextXAlignment.Left
+    skyHeader.Parent = panelVisual
+    visualY = visualY + 16
+    
+    local skyIdBox = Instance.new("TextBox")
+    skyIdBox.Size = UDim2.new(0, colWv - 55, 0, 22)
+    skyIdBox.Position = UDim2.new(0, colV1, 0, visualY)
+    skyIdBox.BackgroundColor3 = Color3.fromRGB(40,40,50)
+    skyIdBox.Text = ""
+    skyIdBox.PlaceholderText = "ID"
+    skyIdBox.TextColor3 = Color3.fromRGB(255,255,255)
+    skyIdBox.Font = Enum.Font.Gotham
+    skyIdBox.TextSize = 8
+    skyIdBox.Parent = panelVisual
+    local skyCorner = Instance.new("UICorner")
+    skyCorner.CornerRadius = UDim.new(0, 3)
+    skyCorner.Parent = skyIdBox
+    
+    CreateButton(panelVisual, colV1 + colWv - 50, visualY, 45, "Set", Color3.fromRGB(60,80,100), function()
+        local id = skyIdBox.Text
+        if id ~= "" then SetSkybox(id) end
+    end)
+    visualY = visualY + 26
+    
+    CreateButton(panelVisual, colV1, visualY, colWv, "Reset Sky", Color3.fromRGB(80,60,60), function()
+        SetSkybox("")
+    end)
+    visualY = visualY + 26
+    
+    CreateCheckbox(panelVisual, colV1, visualY, colWv, "Notif", NotificationsEnabled, function(val) NotificationsEnabled = val end)
+    visualY = visualY + 22
+    
+    CreateCheckbox(panelVisual, colV1, visualY, colWv, "Forcefield", ForcefieldEnabled, function(val)
+        ForcefieldEnabled = val
+        if val then CreateForcefield() else ClearForcefield() end
+    end)
+    CreateCycleColorPicker(panelVisual, colV2, visualY, colWv, "Color:", ForcefieldColor, function(c)
+        ForcefieldColor = c
+        if ForcefieldEnabled then CreateForcefield() end
+    end)
+    visualY = visualY + 28
+    
+    local crossHeader = Instance.new("TextLabel")
+    crossHeader.Size = UDim2.new(0, colWv, 0, 16)
+    crossHeader.Position = UDim2.new(0, colV1, 0, visualY)
+    crossHeader.BackgroundTransparency = 1
+    crossHeader.Text = "🎯 CROSSHAIR"
+    crossHeader.TextColor3 = Color3.fromRGB(200,200,255)
+    crossHeader.Font = Enum.Font.GothamBold
+    crossHeader.TextSize = 10
+    crossHeader.TextXAlignment = Enum.TextXAlignment.Left
+    crossHeader.Parent = panelVisual
+    visualY = visualY + 16
+    
+    CreateCheckbox(panelVisual, colV1, visualY, colWv, "Habilitar", CrosshairSettings.Enabled, function(val) CrosshairSettings.Enabled = val end)
+    visualY = visualY + 22
+    
+    CreateCycleDropdown(panelVisual, colV1, visualY, colWv, "Modo:", {"Center", "Mouse"}, CrosshairSettings.Mode, function(val) CrosshairSettings.Mode = val end)
+    visualY = visualY + 26
+    
+    CreateCycleDropdown(panelVisual, colV1, visualY, colWv, "Forma:", {"Cross", "Circle", "Dot"}, CrosshairSettings.Shape, function(val) CrosshairSettings.Shape = val end)
+    visualY = visualY + 26
+    
+    CreateCycleDropdown(panelVisual, colV1, visualY, colWv, "Anim:", {"None", "Pulse", "Spin", "Breathe"}, CrosshairSettings.Animation, function(val) CrosshairSettings.Animation = val end)
+    visualY = visualY + 26
+    
+    CreateCheckbox(panelVisual, colV1, visualY, colWv, "Texto", CrosshairSettings.TextEnabled, function(val) CrosshairSettings.TextEnabled = val end)
+    CreateCycleColorPicker(panelVisual, colV2, visualY, colWv, "Color:", CrosshairSettings.Color, function(c) CrosshairSettings.Color = c end)
+    visualY = visualY + 28
+    
+    CreateCheckbox(panelVisual, colV1, visualY, colWv, "FOV Circle", FOVCircleEnabled, function(val) 
+        FOVCircleEnabled = val
+        if FOVCircle then FOVCircle.Visible = val end
+    end)
+    CreateCycleColorPicker(panelVisual, colV2, visualY, colWv, "Color:", FOVCircleColor, function(c) 
+        FOVCircleColor = c
+        if FOVCircle then FOVCircle.Color = c end
+    end)
+    visualY = visualY + 28
+    
+    -- HITSOUNDS
+    local soundHeader = Instance.new("TextLabel")
+    soundHeader.Size = UDim2.new(0, colWv*2+6, 0, 16)
+    soundHeader.Position = UDim2.new(0, colV1, 0, visualY)
+    soundHeader.BackgroundTransparency = 1
+    soundHeader.Text = "🔊 HITSOUNDS"
+    soundHeader.TextColor3 = Color3.fromRGB(255,200,100)
+    soundHeader.Font = Enum.Font.GothamBold
+    soundHeader.TextSize = 10
+    soundHeader.TextXAlignment = Enum.TextXAlignment.Left
+    soundHeader.Parent = panelVisual
+    visualY = visualY + 16
+    
+    local soundSlots = {}
+    for i = 1, 5 do
+        local slotBtn = Instance.new("TextButton")
+        slotBtn.Size = UDim2.new(0, colWv - 10, 0, 18)
+        slotBtn.Position = UDim2.new(0, colV1, 0, visualY + (i-1)*20)
+        slotBtn.BackgroundColor3 = Color3.fromRGB(45,45,55)
+        slotBtn.Text = string.sub(SavedSounds[i], 1, 22)
+        slotBtn.TextColor3 = Color3.fromRGB(255,255,255)
+        slotBtn.Font = Enum.Font.Gotham
+        slotBtn.TextSize = 8
+        slotBtn.Parent = panelVisual
+        local slotCorner = Instance.new("UICorner")
+        slotCorner.CornerRadius = UDim.new(0, 3)
+        slotCorner.Parent = slotBtn
+        slotBtn.MouseButton1Click:Connect(function()
+            SelectedSoundSlot = i
+            CurrentSoundId = SavedSounds[i]
+            for _, b in ipairs(soundSlots) do b.BackgroundColor3 = Color3.fromRGB(45,45,55) end
+            slotBtn.BackgroundColor3 = Color3.fromRGB(75,75,90)
+        end)
+        soundSlots[i] = slotBtn
+    end
+    visualY = visualY + 5*20 + 5
+    
+    local customSoundBox = Instance.new("TextBox")
+    customSoundBox.Size = UDim2.new(0, colWv - 55, 0, 20)
+    customSoundBox.Position = UDim2.new(0, colV1, 0, visualY)
+    customSoundBox.BackgroundColor3 = Color3.fromRGB(40,40,50)
+    customSoundBox.Text = ""
+    customSoundBox.PlaceholderText = "ID"
+    customSoundBox.TextColor3 = Color3.fromRGB(255,255,255)
+    customSoundBox.Font = Enum.Font.Gotham
+    customSoundBox.TextSize = 8
+    customSoundBox.Parent = panelVisual
+    local customCorner = Instance.new("UICorner")
+    customCorner.CornerRadius = UDim.new(0, 3)
+    customCorner.Parent = customSoundBox
+    
+    CreateButton(panelVisual, colV1 + colWv - 50, visualY, 45, "Set", Color3.fromRGB(60,80,100), function()
+        local id = customSoundBox.Text
+        if id ~= "" then
+            if not id:match("^rbxassetid://") then id = "rbxassetid://" .. id:gsub("%D", "") end
+            CurrentSoundId = id
+        end
+    end)
+    visualY = visualY + 24
+    
+    CreateButton(panelVisual, colV1, visualY, colWv-5, "Guardar", Color3.fromRGB(70,100,70), function()
+        local id = customSoundBox.Text
+        if id == "" then return end
+        if not id:match("^rbxassetid://") then id = "rbxassetid://" .. id:gsub("%D", "") end
+        SavedSounds[SelectedSoundSlot] = id
+        soundSlots[SelectedSoundSlot].Text = string.sub(id, 1, 22)
+        SaveSoundSlots()
+    end)
+    CreateButton(panelVisual, colV2, visualY, colWv-5, "Reset", Color3.fromRGB(100,60,60), function()
+        SavedSounds = {"rbxassetid://124356179581089","rbxassetid://135478009117226","rbxassetid://140721035016341","rbxassetid://140367458608473","rbxassetid://736191318"}
+        for i=1,5 do soundSlots[i].Text = string.sub(SavedSounds[i],1,22) end
+        CurrentSoundId = SavedSounds[1]
+        SaveSoundSlots()
+    end)
+    visualY = visualY + 26
+    
+    CreateCheckbox(panelVisual, colV1, visualY, colWv, "Hit Effect", HitEffectEnabled, function(val) HitEffectEnabled = val end)
+visualY = visualY + 22
+
+CreateCheckbox(panelVisual, colV1, visualY, colWv, "Hit Sound", HitSoundEnabled, function(val) HitSoundEnabled = val end)
+visualY = visualY + 22
+    
+    local hitEffectHeader = Instance.new("TextLabel")
+    hitEffectHeader.Size = UDim2.new(0, colWv, 0, 16)
+    hitEffectHeader.Position = UDim2.new(0, colV1, 0, visualY)
+    hitEffectHeader.BackgroundTransparency = 1
+    hitEffectHeader.Text = "✨ " .. HitEffectStyle
+    hitEffectHeader.TextColor3 = Color3.fromRGB(255,200,100)
+    hitEffectHeader.Font = Enum.Font.GothamBold
+    hitEffectHeader.TextSize = 9
+    hitEffectHeader.TextXAlignment = Enum.TextXAlignment.Left
+    hitEffectHeader.Parent = panelVisual
+    
+    CreateButton(panelVisual, colV2, visualY-6, colWv, "Cambiar", Color3.fromRGB(60,80,100), function()
+        local idx = table.find(HitEffectStyles, HitEffectStyle) or 1
+        idx = idx + 1
+        if idx > #HitEffectStyles then idx = 1 end
+        HitEffectStyle = HitEffectStyles[idx]
+        hitEffectHeader.Text = "✨ " .. HitEffectStyle
+    end)
+    visualY = visualY + 20
+    
+    local chamHeader = Instance.new("TextLabel")
+    chamHeader.Size = UDim2.new(0, colWv, 0, 16)
+    chamHeader.Position = UDim2.new(0, colV1, 0, visualY)
+    chamHeader.BackgroundTransparency = 1
+    chamHeader.Text = "💀 HIT CHAM"
+    chamHeader.TextColor3 = Color3.fromRGB(255,200,100)
+    chamHeader.Font = Enum.Font.GothamBold
+    chamHeader.TextSize = 10
+    chamHeader.TextXAlignment = Enum.TextXAlignment.Left
+    chamHeader.Parent = panelVisual
+    visualY = visualY + 16
+    
+    CreateCheckbox(panelVisual, colV1, visualY, colWv, "Habilitar", HitChamSettings.Enabled, function(val) HitChamSettings.Enabled = val end)
+    visualY = visualY + 22
+    
+    CreateCycleDropdown(panelVisual, colV1, visualY, colWv, "Modo:", {"Cham", "Skeleton"}, HitChamSettings.Mode, function(val) HitChamSettings.Mode = val end)
+    visualY = visualY + 26
+    
+    CreateCycleDropdown(panelVisual, colV1, visualY, colWv, "Mat:", {"Neon", "Forcefield", "SmoothPlastic"}, HitChamSettings.Material, function(val) HitChamSettings.Material = val end)
+    visualY = visualY + 26
+    
+    CreateNumberInput(panelVisual, colV1, visualY, colWv, "Dur:", HitChamSettings.Duration, function(val) HitChamSettings.Duration = math.max(0.5, val) end)
+    CreateCycleColorPicker(panelVisual, colV2, visualY, colWv, "Color:", HitChamSettings.Color, function(c) HitChamSettings.Color = c end)
+    visualY = visualY + 28
+    
+    panelVisual.CanvasSize = UDim2.new(0, 0, 0, visualY + 10)
+    
+    -- ========== TARGET LIST ==========
+    local listY = 2
+    CreateButton(panelPlayerList, col1_x, listY, colW, "Refrescar", Color3.fromRGB(50,50,60), RefreshPlayerList)
+    CreateButton(panelPlayerList, col2_x, listY, colW, "Limpiar", Color3.fromRGB(60,40,40), function()
+        ManualTarget = nil
+        RefreshPlayerList()
+    end)
+    listY = listY + 26
+    
+    PlayerListScrollingFrame = Instance.new("ScrollingFrame")
+    PlayerListScrollingFrame.Size = UDim2.new(1, 0, 1, -36)
+    PlayerListScrollingFrame.Position = UDim2.new(0, 0, 0, 30)
+    PlayerListScrollingFrame.BackgroundColor3 = Color3.fromRGB(20,20,25)
+    PlayerListScrollingFrame.BorderSizePixel = 0
+    PlayerListScrollingFrame.ScrollBarThickness = 4
+    PlayerListScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    PlayerListScrollingFrame.Parent = panelPlayerList
+    local listCorner = Instance.new("UICorner")
+    listCorner.CornerRadius = UDim.new(0, 5)
+    listCorner.Parent = PlayerListScrollingFrame
+    RefreshPlayerList()
+    
+    panelAimbot.Visible = true
+end
+
+-- ================================
+-- FOV CIRCLE
+-- ================================
+local function CreateFOVCircle()
+    local success, circle = pcall(function() return Drawing.new("Circle") end)
+    if success and circle then
+        FOVCircle = circle
+        FOVCircle.Thickness = 2
+        FOVCircle.NumSides = 100
+        FOVCircle.Radius = FOVRadius
+        FOVCircle.Filled = false
+        FOVCircle.Color = FOVCircleColor
+        FOVCircle.Visible = FOVCircleEnabled
+    end
+end
+
+-- ================================
+-- INICIALIZACIÓN
+-- ================================
+LoadSavedData()
+CreateGUI()
+CreateFOVCircle()
+CreateToggleGuiButton()
+UpdatePrediction()
+ShowWelcomeScreen()
+
+-- ================================
+-- RENDER LOOP
+-- ================================
+local lastTime = tick()
+RunService.RenderStepped:Connect(function()
+    local now = tick()
+    local dt = math.min(0.033, now - lastTime)
+    lastTime = now
+    
+    UpdatePrediction()
+    grayPulse = grayPulse + 0.03
+    if FOVCircle then
+        FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        FOVCircle.Color = FOVCircleColor
+        FOVCircle.Radius = FOVRadius
+        FOVCircle.Visible = FOVCircleEnabled
+    end
+    
+    if VelocitySpooferEnabled and LocalPlayer.Character then
+        local root = GetRootPart(LocalPlayer.Character)
+        if root then
+            local originalVel = root.Velocity
+            if VelocitySpooferMode == "Underground" then
+                root.Velocity = originalVel + Vector3.new(0, -50, 0)
+            elseif VelocitySpooferMode == "Sky" then
+                root.Velocity = originalVel + Vector3.new(0, 100, 0)
+            elseif VelocitySpooferMode == "Prediction Breaker" then
+                root.Velocity = Vector3.new(0, 0, 0)
+            elseif VelocitySpooferMode == "Custom" then
+                root.Velocity = Vector3.new(VelocitySpooferX, VelocitySpooferY, VelocitySpooferZ)
+            end
+        end
+    end
+    
+    if SpinBotEnabled and LocalPlayer.Character then
+        local hrp = GetRootPart(LocalPlayer.Character)
+        if hrp then
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(SpinBotSpeed * dt * 10), 0)
+        end
+    end
+    
+    UpdateCamlock()
+    UpdateSilentAim()
+    UpdateTargetESP()
+    UpdateWalkspeed()
+    UpdateRageModes(dt)
+    UpdateCrosshair()
+    
+    if PredictionCircleEnabled then
+        local target = nil
+        if IndependentSilentEnabled then
+            target = GetClosestTargetInFOV()
+        elseif CamlockEnabled and CamlockLockedTarget then
+            target = CamlockLockedTarget
+        elseif SilentEnabled and SilentLockedTarget then
+            target = SilentLockedTarget
+        end
+        
+        if target and target.Character then
+            local part = GetAimPart(target)
+            if part then
+                local predictedPos = GetPredictedPosition(target.Character, part)
+                local screenPos, onScreen = Camera:WorldToViewportPoint(predictedPos)
+                if onScreen then
+                    if not PredictionCircle then
+                        local success, circle = pcall(function() return Drawing.new("Circle") end)
+                        if success and circle then
+                            PredictionCircle = circle
+                            PredictionCircle.Thickness = 2
+                            PredictionCircle.NumSides = 40
+                            PredictionCircle.Filled = false
+                            PredictionCircle.Color = Color3.fromRGB(255, 255, 255)
+                        end
+                    end
+                    if PredictionCircle then
+                        local distance = (Camera.CFrame.Position - predictedPos).Magnitude
+                        local radius = math.clamp(200 / (distance + 20), 8, 50)
+                        local pulse = 0.5 + math.sin(tick() * 10) * 0.2
+                        PredictionCircle.Radius = radius * (0.8 + pulse * 0.4)
+                        PredictionCircle.Position = Vector2.new(screenPos.X, screenPos.Y)
+                        PredictionCircle.Visible = true
+                        local brightness = 200 + math.sin(tick() * 8) * 55
+                        PredictionCircle.Color = Color3.fromRGB(brightness, brightness, 255)
+                    end
+                else
+                    if PredictionCircle then PredictionCircle.Visible = false end
+                end
+            else
+                if PredictionCircle then PredictionCircle.Visible = false end
+            end
+        else
+            if PredictionCircle then PredictionCircle.Visible = false end
+        end
+    else
+        if PredictionCircle then PredictionCircle.Visible = false end
+    end
+    
+    local currentTarget = nil
+    if IndependentSilentEnabled then
+        currentTarget = GetClosestTargetInFOV()
+    elseif CamlockEnabled and CamlockLockedTarget then
+        currentTarget = CamlockLockedTarget
+    elseif SilentEnabled and SilentLockedTarget then
+        currentTarget = SilentLockedTarget
+    end
+
+    if currentTarget and currentTarget.Character then
+        local hum = currentTarget.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            local lastHealth = LastHealth[currentTarget] or hum.Health
+            local damageDone = lastHealth - hum.Health
+
+            if damageDone > 0.05 then
+                local now = tick()
+                local lastGlobal = LastGlobalHitTime or 0
+                local lastThis = LastHitTime[currentTarget] or 0
+
+                local soundCooldown = 0.15
+                local visualCooldown = 0.15
+
+                if (now - lastThis) >= visualCooldown then
+                    PlayHitEffectOnly(currentTarget)
+                    LastHitTime[currentTarget] = now
+                end
+
+                if (now - lastGlobal) >= soundCooldown then
+                    PlayHitSoundOnly(currentTarget)
+                    LastGlobalHitTime = now
+                end
+            end
+
+            LastHealth[currentTarget] = hum.Health
+        end
+    end
+
+    for ply, _ in pairs(LastHealth) do
+        if not ply or not ply.Character or not ply.Character:FindFirstChildOfClass("Humanoid") then
+            LastHealth[ply] = nil
+            LastHitTime[ply] = nil
+        end
+    end
+    
+    if AutoAirshotEnabled then
+        local target = nil
+        if IndependentSilentEnabled then
+            target = GetClosestTargetInFOV()
+        elseif CamlockEnabled then
+            target = CamlockLockedTarget
+        elseif SilentEnabled then
+            target = SilentLockedTarget
+        end
+        if target and target.Character then
+            local hum = target.Character:FindFirstChildOfClass("Humanoid")
+            if hum and IsInAir(hum) then
+                if AirStartTime == 0 then AirStartTime = tick() end
+                if tick() - AirStartTime >= AirDelay then
+                    TryAutoAirshot()
+                    AirStartTime = tick()
+                end
+            else
+                AirStartTime = 0
+            end
+        else
+            AirStartTime = 0
+        end
+    else
+        AirStartTime = 0
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function()
+    wait(1)
+    if MacroEnabled then UpdateMacro() end
+    if AuraEnabled then ApplyAura(CurrentAuraDesign) end
+    if TargetStrafeEnabled then EnableNoclip() end
+    if DesyncEnabled then StartDesync() end
+    if ForcefieldEnabled then
+        task.wait(0.5)
+        CreateForcefield()
+    end
+end)
+
+print("✅ DEX.CC")            end
         end
     end
 
