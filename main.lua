@@ -6543,4 +6543,4 @@ LocalPlayer.CharacterAdded:Connect(function()
     if TargetStrafeEnabled then EnableNoclip() end
 end)
 
-print("✅ DEX.CC COMPLETO CARGADO")
+print(("✅ DEX.CC")
